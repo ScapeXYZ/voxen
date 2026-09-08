@@ -254,8 +254,9 @@ class Voxen(gl.Contract):
             if option.strip() in seen:
                 raise gl.vm.UserError("Duplicate options")
             seen.append(option.strip())
-        if (type(start_time) is not int or type(end_time) is not int
-                or start_time < 0 or end_time <= start_time):
+        self._uint256(start_time, "time range")
+        self._uint256(end_time, "time range")
+        if end_time <= start_time:
             raise gl.vm.UserError("Invalid time range")
         if result_visibility not in ("LIVE", "HIDDEN_UNTIL_CLOSE"):
             raise gl.vm.UserError("Unsupported result visibility")
@@ -378,21 +379,34 @@ class Voxen(gl.Contract):
 
 
     def _evm_address(self, value):
-        """Accept hex EVM addresses only; Address also accepts base64 by default.
+        """Normalize CLI-decoded or string EVM addresses.
 
-        Lower/upper case hex is accepted. Mixed case must have a valid EIP-55
-        checksum. Zero is not a credential contract or a calling wallet.
+        GenVM decodes CLI SPECIAL_ADDR calldata as Address; older CLI input
+        may instead be a uint160 integer. SDK uint types are plain int aliases.
+        Strings may be lower/upper hex; mixed case must have valid EIP-55.
+        Zero addresses are rejected.
         """
+        if type(value) is Address:
+            value = value.as_hex
+        elif type(value) is int:
+            if not 0 < value < 2**160:
+                raise gl.vm.UserError("Invalid EVM address")
+            value = "0x" + format(value, "040x")
+
         if (type(value) is not str or len(value) != 42
                 or not value.startswith("0x")
                 or any(c not in "0123456789abcdefABCDEF" for c in value[2:])):
             raise gl.vm.UserError("Invalid EVM address")
+
         normalized = Address(value).as_hex
         body = value[2:]
+
         if body != body.lower() and body != body.upper() and value != normalized:
             raise gl.vm.UserError("Invalid EVM address checksum")
+
         if Address(value).as_bytes == bytes(20):
             raise gl.vm.UserError("Zero EVM address is not allowed")
+
         return normalized
 
     def _uint256(self, value, label, positive=False):

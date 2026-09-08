@@ -1343,10 +1343,114 @@ def test_standalone_transport_helpers_match_probe():
     assert helpers[0] == helpers[1]
 
 
-@pytest.mark.parametrize("value", [True, False, 1, 2**160 - 1, 2**160])
+@pytest.mark.parametrize("value", [True, False, 0, -1, 2**160])
 def test_production_address_fields_reject_numeric_values(voxen, value):
     with pytest.raises(ContractErrors):
         proposal(voxen, **dict(NFT_CONFIG, credential_contract_address=value))
     pid = proposal(voxen)
     with pytest.raises(ContractErrors):
         voxen.check_eligibility(pid, value)
+
+
+BRADBURY_CREDENTIAL = "0x3e908eFAb8f9C6DAb975f4BdcFC4e4267c6D7b97"
+
+
+def bradbury_args():
+    # Live timestamps were not supplied; use valid positive Unix seconds.
+    return dict(title="Voxen NFT Eligibility Proof",
+                description="Live Bradbury proof that only wallets holding the configured ERC1155 credential can vote.",
+                options=["Approve", "Reject"], start_time=1788901200, end_time=1788987600,
+                eligibility_mode="POAP_NFT", space_id=None, evidence_url=None,
+                governance_guard_required=False, result_visibility="LIVE",
+                vote_change_policy="FINAL_ON_CAST", minimum_gen_balance=None,
+                credential_contract_address=BRADBURY_CREDENTIAL,
+                credential_label="Voxen ERC1155 Test Credential", credential_type="ERC1155",
+                credential_chain_id=4221, credential_token_id=501)
+
+
+@pytest.mark.parametrize("representation", ["string", "integer", "address"])
+def test_bradbury_create_proposal_calldata(voxen, representation):
+    from genlayer import Address, u256
+    from genlayer.py import calldata
+    args = bradbury_args()
+    args["credential_contract_address"] = {
+        "string": BRADBURY_CREDENTIAL,
+        "integer": int(BRADBURY_CREDENTIAL, 16),
+        "address": Address(BRADBURY_CREDENTIAL),
+    }[representation]
+    # The installed CLI encodes 40-digit hex as SPECIAL_ADDR; the GenVM
+    # decoder produces Address, even though the method annotation is str.
+    args = calldata.decode(calldata.encode(args))
+    for field in ("start_time", "end_time", "credential_chain_id", "credential_token_id"):
+        assert type(args[field]) is int
+        assert type(u256(args[field])) is int  # SDK NewType, not a wrapper.
+    assert type(args["options"]) is list
+    assert args["governance_guard_required"] is False
+    assert args["space_id"] is args["evidence_url"] is args["minimum_gen_balance"] is None
+    pid = voxen.create_proposal(**args)
+    stored = voxen.get_proposal(pid)
+    assert pid == "proposal-1"
+    for field in ("title", "description", "options", "start_time", "end_time", "space_id",
+                  "evidence_url", "governance_guard_required", "result_visibility", "vote_change_policy"):
+        assert stored[field] == args[field]
+    assert stored["eligibility"] == {
+        "mode": "POAP_NFT", "credential_contract_address": Address(BRADBURY_CREDENTIAL).as_hex,
+        "credential_label": args["credential_label"], "credential_type": "ERC1155",
+        "credential_chain_id": "4221", "credential_scope": "TOKEN_ID", "credential_token_id": "501"}
+    assert int(voxen._instance.proposal_count) == 1
+    assert voxen.get_creator_proposal_ids(address(OWNER)) == [pid]
+
+
+@pytest.mark.parametrize("field", ["start_time", "end_time", "credential_chain_id", "credential_token_id"])
+@pytest.mark.parametrize("bad", [True, False, -1, 2**256, "501", None])
+def test_bradbury_invalid_uint_is_atomic(voxen, field, bad):
+    args = bradbury_args()
+    args[field] = bad
+    assert_bradbury_rejected_without_writes(voxen, args)
+
+
+def assert_bradbury_rejected_without_writes(voxen, args):
+    # Preserve an existing proposal too; direct calls do not emulate rollback.
+    pid = voxen.create_proposal(**bradbury_args())
+    instance = voxen._instance
+    creator = voxen.get_proposal(pid)["creator"]
+    before = (int(instance.proposal_count), instance.proposals.get(pid),
+              instance.proposals.get("proposal-2"), instance.creator_proposals.get(creator))
+    with pytest.raises(ContractErrors):
+        voxen.create_proposal(**args)
+    assert (int(instance.proposal_count), instance.proposals.get(pid),
+            instance.proposals.get("proposal-2"), instance.creator_proposals.get(creator)) == before
+
+
+@pytest.mark.parametrize("bad", [True, False, 0, -1, 2**160, "0x" + "0" * 40,
+                                  "0x3E908eFAb8f9C6DAb975f4BdcFC4e4267c6D7b97", None, "zero-native"])
+def test_bradbury_invalid_address_is_atomic(voxen, bad):
+    from genlayer import Address
+    if bad == "zero-native":
+        bad = Address(bytes(20))
+    args = bradbury_args()
+    args["credential_contract_address"] = bad
+    assert_bradbury_rejected_without_writes(voxen, args)
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("governance_guard_required", 0), ("governance_guard_required", 1),
+    ("governance_guard_required", "false"), ("governance_guard_required", None),
+    ("options", '["Approve","Reject"]'), ("options", None),
+    ("options", ["Approve", False]), ("options", ["Approve", "Approve"]),
+    ("minimum_gen_balance", 0), ("minimum_gen_balance", "null"),
+    ("space_id", "null"), ("credential_chain_id", 0),
+])
+def test_bradbury_invalid_other_boundaries_are_atomic(voxen, field, bad):
+    args = bradbury_args()
+    args[field] = bad
+    assert_bradbury_rejected_without_writes(voxen, args)
+
+
+@pytest.mark.parametrize("token", [0, 2**256 - 1])
+def test_bradbury_uint_endpoints(voxen, token):
+    args = bradbury_args()
+    args.update(start_time=0, end_time=2**256 - 1, credential_token_id=token)
+    pid = voxen.create_proposal(**args)
+    assert voxen.get_proposal(pid)["end_time"] == 2**256 - 1
+    assert voxen.get_proposal_eligibility(pid)["credential_token_id"] == str(token)
