@@ -1,0 +1,53 @@
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env
+node_modules
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+/context
+/frontend/.next
+/frontend/next-env.d.ts
+/frontend/bun.lock
+/frontend/package-lock.json
+*.compiled.js
+package-lock.json
+
+
+# Local environment / secrets
+.env.*
+!.env.example
+*.pem
+*.key
+*.keystore
+*keystore*.json
+*.secret
+*.secrets
+credentials.json
+
+# Local wallets / keys
+.voxen-keys/
+keys/
+
+# Build / test artifacts
+.pytest_cache/
+coverage/
+dist/
+build/
+artifacts/
+out/
+cache/
+
+# Python virtual environment
+.venv/
+venv/
