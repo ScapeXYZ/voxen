@@ -1,10 +1,10 @@
 import Link from "next/link";
-import type { Space } from "@/types/voxen";
+import type { Community } from "@/types/voxen";
 import { ArrowUpRight } from "lucide-react";
-export function SpaceNode({ space, count }: { space: Space; count: number }) {
+export function SpaceNode({ space, count }: { space: Community; count: number }) {
   return (
     <Link
-      href={`/spaces/${space.id}`}
+      href={`/communities/${space.id}`}
       className={`space-node space-${space.id}`}
     >
       <span className="space-symbol">{space.symbol}</span>

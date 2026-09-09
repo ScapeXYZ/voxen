@@ -41,7 +41,7 @@ def advance(voxen, pid, status):
         p = voxen.get_proposal(pid)
     except ContractErrors:
         return voxen.transition_proposal(pid, status)
-    if (status == "OPEN" and p["status"] == "REVIEW"
+    if (status in ("OPEN", "PUBLISHED") and p["status"] == "REVIEW"
             and voxen.get_latest_governance_review(pid) is None):
         voxen.request_governance_review(pid)
     return voxen.transition_proposal(pid, status)
@@ -175,7 +175,7 @@ def test_standalone_and_reads(voxen, direct_vm):
     assert p == dict(id="proposal-1", space_id=None, creator=p["creator"],
                      title="Choose a venue", description="Community meeting",
                      options=["Park", "Library"], start_time=100, end_time=200,
-                     evidence_url="https://example.org/evidence", status="DRAFT",
+                     evidence_url="https://example.org/evidence", status="PUBLISHED",
                      governance_guard_required=False, result_visibility="HIDDEN_UNTIL_CLOSE",
                      vote_change_policy="CHANGE_UNTIL_CLOSE", revision=1, eligibility={"mode": "GEN", "minimum_gen_balance": "1", "balance_unit": "wei", "configured_evm_chain_id": "4221"})
     assert p["creator"].lower() == address(OTHER)
@@ -260,7 +260,7 @@ def test_invalid_proposal_fields(voxen, field, value):
 @pytest.mark.parametrize("guard", [False, True])
 def test_lifecycle(voxen, guard):
     pid = proposal(voxen, governance_guard_required=guard)
-    path = ["REVIEW", "OPEN", "CLOSED", "FINALIZED"] if guard else ["OPEN", "CLOSED", "FINALIZED"]
+    path = ["REVIEW", "PUBLISHED", "FINALIZED"] if guard else ["FINALIZED"]
     for status in path:
         advance(voxen, pid, status)
         assert voxen.get_proposal(pid)["status"] == status
@@ -270,10 +270,10 @@ def test_lifecycle(voxen, guard):
 @pytest.mark.parametrize("guard", [False, True])
 def test_all_invalid_lifecycle_edges(voxen, guard):
     pid = proposal(voxen, governance_guard_required=guard)
-    path = ["DRAFT"] + (["REVIEW"] if guard else []) + ["OPEN", "CLOSED", "FINALIZED"]
+    path = (["DRAFT", "REVIEW"] if guard else []) + ["PUBLISHED", "FINALIZED"]
     for i, current in enumerate(path):
         expected = path[i + 1] if i + 1 < len(path) else None
-        for target in ["DRAFT", "REVIEW", "OPEN", "CLOSED", "FINALIZED", "INVALID", "open"]:
+        for target in ["DRAFT", "REVIEW", "PUBLISHED", "CLOSED", "FINALIZED", "INVALID", "open"]:
             if target != expected:
                 with pytest.raises(ContractErrors, match="lifecycle"):
                     advance(voxen, pid, target)
@@ -283,7 +283,7 @@ def test_all_invalid_lifecycle_edges(voxen, guard):
 
 
 def test_draft_edits_and_validation(voxen):
-    pid = proposal(voxen)
+    pid = proposal(voxen, governance_guard_required=True)
     edit(voxen, pid)
     p = voxen.get_proposal(pid)
     assert p["title"] == "New title" and p["options"] == ["A", "B"]
@@ -297,11 +297,11 @@ def test_draft_edits_and_validation(voxen):
         assert voxen.get_proposal(pid) == p
 
 
-@pytest.mark.parametrize("status", ["OPEN", "CLOSED", "FINALIZED"])
+@pytest.mark.parametrize("status", ["PUBLISHED", "FINALIZED"])
 def test_frozen_configuration(voxen, status):
     sid = voxen.create_space("Guard", governance_guard_enabled=True)
     pid = proposal(voxen, space_id=sid)
-    for step in ["REVIEW", "OPEN", "CLOSED", "FINALIZED"]:
+    for step in ["REVIEW", "PUBLISHED", "FINALIZED"]:
         advance(voxen, pid, step)
         if step == status:
             break
@@ -345,11 +345,12 @@ def test_space_owner_cannot_control_another_creators_proposal(voxen, direct_vm):
         advance(voxen, pid, "OPEN")
 
 
-def test_open_rechecks_space_access_but_close_remains_available(voxen, direct_vm):
+def test_publication_rechecks_space_access_but_finalization_remains_available(voxen, direct_vm):
     sid = voxen.create_space("Community")
     voxen.add_admin(sid, address(ADMIN))
     direct_vm.sender = ADMIN
-    pid = proposal(voxen, space_id=sid)
+    pid = proposal(voxen, space_id=sid, governance_guard_required=True)
+    advance(voxen, pid, "REVIEW")
     direct_vm.sender = OWNER
     voxen.remove_admin(sid, address(ADMIN))
     direct_vm.sender = ADMIN
@@ -368,7 +369,6 @@ def test_open_rechecks_space_access_but_close_remains_available(voxen, direct_vm
     direct_vm.sender = OWNER
     voxen.set_space_active(sid, False)
     direct_vm.sender = ADMIN
-    advance(voxen, pid, "CLOSED")
     advance(voxen, pid, "FINALIZED")
 
 
@@ -411,7 +411,7 @@ def test_creation_requires_explicit_eligibility(voxen):
 def test_exactly_one_supported_mode_required(voxen, mode):
     with pytest.raises(ContractErrors, match="eligibility mode"):
         proposal(voxen, eligibility_mode=mode)
-    pid = proposal(voxen)
+    pid = proposal(voxen, governance_guard_required=True)
     before = voxen.get_proposal(pid)
     with pytest.raises(ContractErrors, match="eligibility mode"):
         voxen.set_proposal_eligibility(pid, mode)
@@ -515,7 +515,7 @@ def test_unknown_eligibility_mode(voxen, mode):
 
 
 def test_replace_eligibility_and_preserve_through_content_edit(voxen):
-    pid = proposal(voxen)
+    pid = proposal(voxen, governance_guard_required=True)
     voxen.set_proposal_eligibility(pid, "GEN", minimum_gen_balance=10**18)
     gen = voxen.get_proposal_eligibility(pid)
     edit(voxen, pid)
@@ -533,7 +533,7 @@ def test_replace_eligibility_and_preserve_through_content_edit(voxen):
     dict(eligibility_mode="PUBLIC", credential_label="bad"),
     dict(NFT_CONFIG, credential_contract_address="bad"), dict(eligibility_mode="BAD")])
 def test_invalid_update_preserves_state(voxen, args):
-    pid = proposal(voxen, **NFT_CONFIG)
+    pid = proposal(voxen, governance_guard_required=True, **NFT_CONFIG)
     before = voxen.get_proposal(pid)
     with pytest.raises(ContractErrors):
         voxen.set_proposal_eligibility(pid, **args)
@@ -551,11 +551,13 @@ def test_eligibility_creator_authority(voxen, direct_vm, sender):
     assert voxen.get_proposal_eligibility(pid) == {"mode": "GEN", "minimum_gen_balance": "1", "balance_unit": "wei", "configured_evm_chain_id": "4221"}
 
 
-@pytest.mark.parametrize("guard,status", [(True, "OPEN"),
-    (False, "OPEN"), (False, "CLOSED"), (False, "FINALIZED")])
+@pytest.mark.parametrize("guard,status", [(True, "PUBLISHED"),
+    (False, "PUBLISHED"), (False, "FINALIZED")])
 def test_eligibility_frozen(voxen, guard, status):
     pid = proposal(voxen, governance_guard_required=guard, **NFT_CONFIG)
-    for step in (["REVIEW"] if guard else []) + ["OPEN", "CLOSED", "FINALIZED"]:
+    for step in (["REVIEW", "PUBLISHED"] if guard else []) + ["FINALIZED"]:
+        if voxen.get_proposal(pid)["status"] == status:
+            break
         advance(voxen, pid, step)
         if step == status:
             break
@@ -626,8 +628,9 @@ def test_transaction_time_window(voxen, monkeypatch, timestamp, now, window):
     # Explicit transaction-context fixture: warp() alone leaves raw datetime stale.
     monkeypatch.setitem(gl.message_raw, "datetime", timestamp)
     assert voxen.get_proposal_time_window(pid) == dict(transaction_time=now,
-        start_time=100, end_time=200, window=window)
-    assert voxen.get_proposal(pid)["status"] == "DRAFT"
+        start_time=100, end_time=200, window=window,
+        effective_status={"BEFORE": "UPCOMING", "WITHIN": "LIVE", "ENDED": "ENDED"}[window])
+    assert voxen.get_proposal(pid)["status"] == "PUBLISHED"
 
 
 @pytest.mark.parametrize("timestamp", [None, "bad", "1970-01-01T00:00:00",
@@ -669,9 +672,8 @@ def voting(voxen, monkeypatch):
 
 
 def open_vote(voxen, **kwargs):
-    pid = proposal(voxen, **kwargs)
-    advance(voxen, pid, "OPEN")
-    return pid
+    # Publication itself schedules voting; no activation transaction.
+    return proposal(voxen, **kwargs)
 
 
 @pytest.mark.parametrize("config", [dict(eligibility_mode="GEN", minimum_gen_balance=1), NFT_CONFIG])
@@ -776,11 +778,8 @@ def test_tally_close_finalize(voxen, voting, direct_vm, choices, option_count, e
     assert voxen.get_proposal_result(pid) is None
     direct_vm.sender = OWNER
     with pytest.raises(ContractErrors, match="before end"):
-        advance(voxen, pid, "CLOSED")
-    with pytest.raises(ContractErrors, match="lifecycle"):
         advance(voxen, pid, "FINALIZED")
     clock(200)
-    advance(voxen, pid, "CLOSED")
     assert voxen.get_proposal_tallies(pid)["counts"] == counts
     assert voxen.get_proposal_result(pid) is None
     advance(voxen, pid, "FINALIZED")
@@ -796,19 +795,19 @@ def test_tally_close_finalize(voxen, voting, direct_vm, choices, option_count, e
     assert voxen.get_proposal_result(pid) == result
 
 
-@pytest.mark.parametrize("status", ["DRAFT", "REVIEW", "CLOSED", "FINALIZED"])
+@pytest.mark.parametrize("status", ["DRAFT", "REVIEW", "FINALIZED"])
 def test_non_open_rejects_votes(voxen, voting, status):
     clock, _ = voting
     pid = proposal(voxen, governance_guard_required=True, vote_change_policy="CHANGE_UNTIL_CLOSE")
-    for step in ["REVIEW", "OPEN", "CLOSED", "FINALIZED"]:
+    for step in ["REVIEW", "PUBLISHED", "FINALIZED"]:
         if voxen.get_proposal(pid)["status"] == status:
             break
-        if step == "CLOSED":
+        if step == "FINALIZED":
             voxen.cast_vote(pid, 0)
             clock(200)
         advance(voxen, pid, step)
     before = voxen.get_proposal_tallies(pid)
-    with pytest.raises(ContractErrors, match="not OPEN"):
+    with pytest.raises(ContractErrors, match="not published"):
         voxen.cast_vote(pid, 1)
     assert voxen.get_proposal_tallies(pid) == before
 
@@ -826,9 +825,8 @@ def test_hidden_reads(voxen, voting, direct_vm):
         assert "result" not in voxen.get_proposal(pid)
         assert voxen.has_voted(pid, address(OWNER))
     clock(200)
-    assert voxen.get_proposal_tallies(pid)["hidden"]  # Time alone does not disclose.
+    assert not voxen.get_proposal_tallies(pid)["hidden"]  # End time discloses without a transaction.
     direct_vm.sender = OWNER
-    advance(voxen, pid, "CLOSED")
     assert voxen.get_proposal_tallies(pid)["counts"] == [0, 1]
     assert voxen.get_vote(pid, address(OWNER))["option_index"] == 1
 
@@ -854,7 +852,7 @@ def test_vote_isolation_and_lifecycle_authority(voxen, voting, direct_vm):
     for sender in [OWNER, ADMIN]:
         direct_vm.sender = sender
         with pytest.raises(ContractErrors, match="Only creator"):
-            advance(voxen, pid, "CLOSED")
+            advance(voxen, pid, "FINALIZED")
     assert voxen.get_proposal_tallies(pid)["counts"] == [1, 0]
     assert voxen.get_proposal_tallies(second)["counts"] == [0, 1]
 
@@ -1020,7 +1018,7 @@ def test_guard_scope_and_invalid_policy(voxen):
     pid = proposal(voxen)
     with pytest.raises(ContractErrors, match="REVIEW"):
         voxen.request_governance_review(pid)
-    voxen.transition_proposal(pid, "OPEN")
+    assert voxen.get_proposal(pid)["status"] == "PUBLISHED"
     assert voxen.get_governance_review_ids(pid) == []
     with pytest.raises(ContractErrors, match="policy"):
         voxen.create_space("Bad", governance_guard_policy="ALLOW")
@@ -1454,3 +1452,50 @@ def test_bradbury_uint_endpoints(voxen, token):
     pid = voxen.create_proposal(**args)
     assert voxen.get_proposal(pid)["end_time"] == 2**256 - 1
     assert voxen.get_proposal_eligibility(pid)["credential_token_id"] == str(token)
+
+
+@pytest.mark.parametrize("now,state", [(99, "UPCOMING"), (100, "LIVE"), (199, "LIVE"), (200, "ENDED"), (201, "ENDED")])
+def test_published_schedule_reads_do_not_mutate(voxen, voting, now, state):
+    clock, _ = voting
+    pid = proposal(voxen)
+    original = voxen.get_proposal(pid)
+    assert original["status"] == "PUBLISHED"
+    clock(now)
+    assert voxen.get_proposal_time_window(pid)["effective_status"] == state
+    assert voxen.get_proposal_result(pid) is None
+    assert voxen.get_proposal(pid) == original
+    with pytest.raises(ContractErrors, match="frozen"):
+        edit(voxen, pid)
+    with pytest.raises(ContractErrors, match="lifecycle"):
+        voxen.transition_proposal(pid, "OPEN")
+
+
+def test_enumeration_pages_and_new_publication(voxen):
+    assert voxen.get_proposal_ids() == dict(ids=[], total=0, next_offset=None)
+    ids = [proposal(voxen) for _ in range(3)]
+    assert voxen.get_proposal_ids(0, 2) == dict(ids=ids[::-1][:2], total=3, next_offset=2)
+    assert voxen.get_proposal_ids(2, 2) == dict(ids=ids[::-1][2:], total=3, next_offset=None)
+    assert voxen.get_proposal_ids(99, 2)["ids"] == []
+    new = proposal(voxen)
+    assert voxen.get_proposal_ids(0, 2)["ids"] == [new, ids[-1]]
+    for offset, limit in [(-1, 2), (0, 0), (0, 51), (True, 2), (0, True)]:
+        with pytest.raises(ContractErrors):
+            voxen.get_proposal_ids(offset, limit)
+
+
+def test_guard_publication_schedules_without_activation(voxen, voting):
+    clock, _ = voting
+    clock(99)
+    pid = proposal(voxen, governance_guard_required=True)
+    advance(voxen, pid, "REVIEW")
+    advance(voxen, pid, "PUBLISHED")
+    assert voxen.get_proposal(pid)["status"] == "PUBLISHED"
+    with pytest.raises(ContractErrors, match="window"):
+        voxen.cast_vote(pid, 0)
+    clock(100)
+    voxen.cast_vote(pid, 0)
+    clock(200)
+    assert voxen.get_proposal_result(pid) is None
+    voxen.transition_proposal(pid, "FINALIZED")
+    assert voxen.get_proposal_time_window(pid)["effective_status"] == "FINALIZED"
+    assert voxen.get_proposal_result(pid)["total_votes"] == 1

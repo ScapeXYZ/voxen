@@ -1,10 +1,10 @@
 export type ProposalStatus =
-  "DRAFT" | "REVIEW" | "OPEN" | "CLOSED" | "FINALIZED";
+  "PUBLISHED" | "DRAFT" | "REVIEW" | "OPEN" | "CLOSED" | "FINALIZED";
 export type EligibilityMode = "GEN_HOLDING" | "POAP_NFT";
 export type VoteChangePolicy = "FINAL_ON_CAST" | "CHANGE_UNTIL_CLOSE";
 export type ResultVisibility = "LIVE" | "HIDDEN_UNTIL_CLOSE";
 export type Eligibility =
-  | { mode: "GEN_HOLDING"; minimum: string }
+  | { mode: "GEN_HOLDING"; minimum: string; chainId?: number }
   | {
       mode: "POAP_NFT";
       chainId: number;
@@ -20,7 +20,17 @@ export interface GovernanceGuardReview {
   evidenceConsistency: string;
   reason: string;
 }
-export interface Space {
+export type CommunityRole = "OWNER" | "ADMIN" | "MEMBER" | "NONE";
+export interface CommunityAccess {
+  wallet: string;
+  communityId: string;
+  role: CommunityRole;
+  whitelisted: boolean;
+}
+export interface Community {
+  whitelist?: string[];
+  rules?: string;
+  guardConfiguration?: { enabled: boolean; nonCompliantPolicy: "BLOCK" | "WARN" };
   id: string;
   name: string;
   description: string;
@@ -39,7 +49,11 @@ export interface Proposal {
   id: string;
   title: string;
   description: string;
+  /** Legacy contract association; not an access grant. */
   spaceId?: string;
+  communityId?: string | null;
+  /** Requesting entity, independent of the onchain creator. Not yet submitted onchain. */
+  representedEntity?: string | null;
   creator: string;
   status: ProposalStatus;
   startsAt: string;
@@ -52,5 +66,39 @@ export interface Proposal {
   options: { id: string; label: string; votes: number }[];
   participation: number;
   result?: "TIED" | string;
-  source: "demo";
+  source: "demo" | "live";
+  talliesHidden?: boolean;
+  guardRequired?: boolean;
+}
+
+// Future Community context only; public create_proposal still accepts one evidence_url.
+export type SupportingSourceType =
+  | "GOVERNANCE_DISCUSSION" | "DOCUMENTATION" | "ANNOUNCEMENT"
+  | "RESEARCH" | "BUDGET" | "GITHUB" | "OTHER";
+export interface SupportingSource {
+  id: string;
+  title?: string;
+  url: string;
+  domain?: string;
+  sourceType?: SupportingSourceType;
+}
+/** Exact review record fields from contracts/voxen.py; no unsupported result lists. */
+export interface GovernanceReviewRecord {
+  id: string;
+  proposal_id: string;
+  proposal_revision: number;
+  rules_revision: number;
+  created_at: number;
+  classification: GovernanceGuardReview["outcome"];
+  risk: GovernanceGuardReview["risk"];
+  confidence: number;
+  evidence_consistent: boolean;
+  reason: string;
+  input_snapshot: { constitution: string; proposal: Record<string, unknown> };
+}
+export interface CommunityProposalRevisionContext {
+  revision: number;
+  reviewHistory: GovernanceReviewRecord[];
+  /** Future persistence, not submitted by the current adapter. */
+  supportingSources?: SupportingSource[];
 }

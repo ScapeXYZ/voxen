@@ -18,14 +18,14 @@ import { SpatialCanvas, graphPosition } from "./SpatialCanvas";
 
 const stages = [
   {
-    name: "Space",
+    name: "Community",
     headline: "A shared purpose.",
     detail:
       "Bring your people together and define the principles that guide your decisions.",
     short: "Community and governance rules",
     icon: Network,
-    href: "/spaces",
-    cta: "Discover Spaces",
+    href: "/communities",
+    cta: "Discover Communities",
     x: 40,
     y: 70,
     width: 240,
@@ -63,8 +63,8 @@ const stages = [
     name: "Governance Guard",
     headline: "Your principles enter the process.",
     detail:
-      "When enabled, Guard reviews a proposal against its Space constitution. The Space decides whether non-compliance blocks or warns.",
-    short: "Checks proposals against Space rules",
+      "When enabled, Guard reviews a proposal against its Community constitution. The Community decides whether non-compliance blocks or warns.",
+    short: "Checks proposals against Community rules",
     icon: Shield,
     href: "#governance-guard",
     cta: "Meet Governance Guard",
@@ -253,7 +253,7 @@ export function GovernanceGraph() {
           <p>
             {stage
               ? stage.detail
-              : "Choose a node to follow the decision-making process, or take a guided journey from Space to finalized outcome."}
+              : "Choose a node to follow the decision-making process, or take a guided journey from Community to finalized outcome."}
           </p>
         </div>
         <div className="story-detail-actions">

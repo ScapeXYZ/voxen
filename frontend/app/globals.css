@@ -2975,3 +2975,14 @@ dd {
     color: var(--muted);
   }
 }
+
+.credential-picker { min-width: 0; }
+.credential-results { list-style: none; padding: 0; margin: 1rem 0; display: grid; gap: .75rem; max-height: 22rem; overflow-y: auto; }
+.credential-result { display: flex; flex-direction: column; align-items: flex-start; gap: .4rem; width: 100%; padding: 1rem; text-align: left; border: 1px solid var(--border, #d5d5d5); border-radius: 10px; background: transparent; color: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.credential-result[aria-pressed="true"] { border-color: currentColor; background: rgba(128, 128, 128, .08); }
+.credential-result:disabled { opacity: .6; cursor: not-allowed; }
+.credential-result:focus-visible { outline: 2px solid currentColor; outline-offset: -3px; }
+.credential-selection { padding: 1rem; border: 1px solid var(--border, #d5d5d5); border-radius: 10px; margin-block: 1rem; }
+.credential-selection .row { flex-wrap: wrap; }
+.credential-picker details { margin-top: 1rem; }
+.credential-picker summary { cursor: pointer; }

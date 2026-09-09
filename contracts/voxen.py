@@ -2,10 +2,10 @@
 """Voxen V0.6: governance compliance consensus alongside deterministic voting.
 
 Times are nonnegative integer Unix seconds. Voting enforces [start, end).
-Lifecycle transitions are creator-controlled; closing requires time >= end.
-Guard REVIEW -> OPEN requires an accepted current review and Space policy approval.
+Published voting is time-driven; finalization explicitly records the result.
+Guard REVIEW -> PUBLISHED requires an accepted current review and Space policy approval.
 Space association and the Guard snapshot are fixed at proposal creation.
-Guard REVIEW edits start a new revision after a completed review; OPEN freezes edits.
+Guard REVIEW edits start a new revision after a completed review; publication freezes edits.
 Creation timestamps are omitted: direct VM message_raw datetime is not refreshed
 by warp(), so it cannot reliably test per-transaction creation times.
 """
@@ -294,7 +294,8 @@ class Voxen(gl.Contract):
             "id": proposal_id, "space_id": space_id, "creator": creator, "revision": 1,
             "title": title, "description": description, "options": options,
             "evidence_url": evidence_url, "start_time": start_time, "end_time": end_time,
-            "status": "DRAFT", "governance_guard_required": governance_guard_required,
+            "status": "DRAFT" if governance_guard_required else "PUBLISHED",
+            "governance_guard_required": governance_guard_required,
             "result_visibility": result_visibility, "vote_change_policy": vote_change_policy,
             "eligibility": eligibility,
         })
@@ -328,12 +329,15 @@ class Voxen(gl.Contract):
 
     @gl.public.write
     def transition_proposal(self, proposal_id: str, status: str) -> None:
-        """Manual V0.1 workflow only; REVIEW does not compute or certify approval."""
+        """Review publication and explicit finalization; OPEN is a legacy publish alias."""
         proposal = self._proposal(proposal_id)
         if proposal["creator"] != self._sender():
             raise gl.vm.UserError("Only creator may transition proposal")
         transitions = {"DRAFT": "REVIEW" if proposal["governance_guard_required"] else "OPEN",
-                       "REVIEW": "OPEN", "OPEN": "CLOSED", "CLOSED": "FINALIZED"}
+                       "REVIEW": "OPEN", "OPEN": "CLOSED", "CLOSED": "FINALIZED",
+                       "PUBLISHED": "FINALIZED"}
+        if status == "PUBLISHED":
+            status = "OPEN"
         if status != transitions.get(proposal["status"]):
             raise gl.vm.UserError("Invalid lifecycle transition")
         if status in ("REVIEW", "OPEN") and proposal["space_id"] is not None:
@@ -343,6 +347,8 @@ class Voxen(gl.Contract):
         if status == "CLOSED" and self._transaction_time() < proposal["end_time"]:
             raise gl.vm.UserError("Cannot close before end time")
         if status == "FINALIZED":
+            if self._transaction_time() < proposal["end_time"]:
+                raise gl.vm.UserError("Cannot finalize before end time")
             counts = self._tallies(proposal)
             highest = max(counts)
             winners = [i for i, count in enumerate(counts) if count == highest]
@@ -353,7 +359,7 @@ class Voxen(gl.Contract):
                 "winning_option": proposal["options"][winner] if winner is not None else None,
                 "total_votes": sum(counts),
             }, sort_keys=True)
-        proposal["status"] = status
+        proposal["status"] = "PUBLISHED" if status == "OPEN" else status
         self._save_proposal(proposal)
 
     @gl.public.view
@@ -363,6 +369,25 @@ class Voxen(gl.Contract):
     @gl.public.view
     def get_proposal(self, proposal_id: str) -> dict:
         return self._proposal(proposal_id)
+
+    @gl.public.view
+    def get_proposal_ids(self, offset: int = 0, limit: int = 20) -> dict:
+        self._uint256(offset, "offset")
+        if type(limit) is not int or not 1 <= limit <= 50:
+            raise gl.vm.UserError("Limit must be between 1 and 50")
+        total = int(self.proposal_count)
+        end = min(offset + limit, total)
+        return {"ids": ["proposal-" + str(total - i) for i in range(offset, end)],
+                "total": total, "next_offset": end if end < total else None}
+
+    def _effective_status(self, proposal):
+        if proposal["status"] == "FINALIZED":
+            return "FINALIZED"
+        if proposal["status"] not in ("PUBLISHED", "OPEN", "CLOSED"):
+            return proposal["status"]
+        now = self._transaction_time()
+        return "UPCOMING" if now < proposal["start_time"] else (
+            "LIVE" if now < proposal["end_time"] else "ENDED")
 
     @gl.public.view
     def get_space_admins(self, space_id: str) -> list[str]:
@@ -538,7 +563,8 @@ class Voxen(gl.Contract):
         state = "BEFORE" if now < proposal["start_time"] else (
             "ENDED" if now >= proposal["end_time"] else "WITHIN")
         return {"transaction_time": now, "start_time": proposal["start_time"],
-                "end_time": proposal["end_time"], "window": state}
+                "end_time": proposal["end_time"], "window": state,
+                "effective_status": self._effective_status(proposal)}
 
 
     def _tallies(self, proposal):
@@ -547,7 +573,8 @@ class Voxen(gl.Contract):
 
     def _results_hidden(self, proposal):
         return (proposal["result_visibility"] == "HIDDEN_UNTIL_CLOSE"
-                and proposal["status"] not in ("CLOSED", "FINALIZED"))
+                and proposal["status"] not in ("CLOSED", "FINALIZED")
+                and self._transaction_time() < proposal["end_time"])
 
     def _vote_key(self, proposal_id, wallet):
         return proposal_id + ":" + wallet
@@ -556,8 +583,8 @@ class Voxen(gl.Contract):
     def cast_vote(self, proposal_id: str, option_index: int) -> None:
         """One caller, one ballot. Every change rechecks eligibility and time."""
         proposal = self._proposal(proposal_id)
-        if proposal["status"] != "OPEN":
-            raise gl.vm.UserError("Proposal is not OPEN")
+        if proposal["status"] not in ("PUBLISHED", "OPEN"):
+            raise gl.vm.UserError("Proposal is not published")
         now = self._transaction_time()
         if not proposal["start_time"] <= now < proposal["end_time"]:
             raise gl.vm.UserError("Outside voting window")

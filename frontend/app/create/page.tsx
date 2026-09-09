@@ -1,4 +1,3 @@
-import { voxenData } from "@/lib/voxen/data";
 import { CreateProposalForm } from "@/components/proposals/CreateProposalForm";
 export default async function Create() {
   return (
@@ -7,9 +6,9 @@ export default async function Create() {
       <h1>Create a proposal.</h1>
       <p className="page-subtitle">
         A proposal is a question for your community to decide by voting. Prepare
-        a draft in six steps; publishing is not connected yet.
+        a draft in six steps, then create a public proposal on Bradbury.
       </p>
-      <CreateProposalForm spaces={await voxenData.listSpaces()} />
+      <CreateProposalForm />
     </main>
   );
 }

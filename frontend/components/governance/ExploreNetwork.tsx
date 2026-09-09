@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Network, List, Search, ArrowUpRight } from "lucide-react";
-import type { Space, Proposal } from "@/types/voxen";
+import type { Community, Proposal } from "@/types/voxen";
 import {
   ProposalNode,
   ProposalCard,
@@ -13,15 +13,15 @@ import { SpatialCanvas, graphPosition, type GraphPoint } from "./SpatialCanvas";
 
 type Group = {
   id: string;
-  space?: Space;
+  space?: Community;
   proposals: Proposal[];
   point: GraphPoint;
   nodes: { proposal: Proposal; point: GraphPoint }[];
 };
 const hub: GraphPoint = { x: 555, y: 340, width: 270, height: 120 };
-/** Stable sample cluster coordinates; extra Spaces receive connected rows below the overview. */
-function layoutGroups(spaces: Space[], proposals: Proposal[]): Group[] {
-  const definitions: { space?: Space; id: string; proposals: Proposal[] }[] =
+/** Stable sample cluster coordinates; extra Communities receive connected rows below the overview. */
+function layoutGroups(spaces: Community[], proposals: Proposal[]): Group[] {
+  const definitions: { space?: Community; id: string; proposals: Proposal[] }[] =
     spaces.map((space) => ({
       space,
       id: space.id,
@@ -75,7 +75,7 @@ export function ExploreNetwork({
   spaces,
   proposals,
 }: {
-  spaces: Space[];
+  spaces: Community[];
   proposals: Proposal[];
 }) {
   const [view, setView] = useState<"network" | "list">("network");
@@ -138,8 +138,8 @@ export function ExploreNetwork({
         <label className="search">
           <Search size={16} />
           <input
-            aria-label="Search proposals and Spaces"
-            placeholder="Search Spaces or proposals"
+            aria-label="Search proposals and Communities"
+            placeholder="Search Communities or proposals"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value);
@@ -183,7 +183,7 @@ export function ExploreNetwork({
         <>
           <div
             className="atlas-navigation"
-            aria-label="Focus a Space in the network"
+            aria-label="Focus a Community in the network"
           >
             <button aria-pressed={activeGroup === null} onClick={reset}>
               All connections
@@ -195,7 +195,7 @@ export function ExploreNetwork({
                 onClick={() => focusGroup(group)}
               >
                 <span className="dot" />
-                {group.space?.name || "Standalone proposals"}
+                {group.space?.name || "Public proposals"}
               </button>
             ))}
             <span>{filtered.length} sample proposals</span>
@@ -210,7 +210,7 @@ export function ExploreNetwork({
             caption={
               <>
                 <span className="atlas-space-key" />
-                Space
+                Community
                 <span className="atlas-proposal-key" />
                 Proposal
                 <span className="atlas-line-key" />
@@ -250,12 +250,12 @@ export function ExploreNetwork({
             <div className="atlas-hub" style={graphPosition(hub)}>
               <span className="eyebrow">THE SHARED NETWORK</span>
               <strong>
-                Independent Spaces.
+                Independent Communities.
                 <br />
                 Connected decisions.
               </strong>
-              <Link href="/create-space">
-                Create your Space
+              <Link href="/create-community">
+                Create your Community
                 <ArrowUpRight size={13} />
               </Link>
             </div>
@@ -263,7 +263,7 @@ export function ExploreNetwork({
               <section
                 key={group.id}
                 className={`atlas-group ${activeGroup && activeGroup !== group.id ? "is-distant" : ""}`}
-                aria-label={`${group.space?.name || "Standalone"} proposal connections`}
+                aria-label={`${group.space?.name || "Public proposal"} proposal connections`}
               >
                 <div
                   className="atlas-space"
@@ -287,7 +287,7 @@ export function ExploreNetwork({
                   ) : (
                     <div className="space-node">
                       <Network size={24} />
-                      <h3>Standalone proposals</h3>
+                      <h3>Public proposals</h3>
                     </div>
                   )}
                 </div>
@@ -316,7 +316,7 @@ export function ExploreNetwork({
                         y: group.point.y + 150,
                       })}
                     >
-                      No matching proposals in this Space.
+                      No matching proposals in this Community.
                     </p>
                   )}
                 </div>
@@ -326,7 +326,7 @@ export function ExploreNetwork({
           <div className="atlas-afterword">
             <span>Every branch begins with a community.</span>
             <p>
-              Choose a Space or proposal to open its details. Participation and
+              Choose a Community or proposal to open its details. Participation and
               review state shown here are illustrative.
             </p>
           </div>
@@ -336,7 +336,7 @@ export function ExploreNetwork({
           {filtered.length ? (
             filtered.map((p) => <ProposalCard key={p.id} proposal={p} />)
           ) : (
-            <div className="empty">No proposals in the matching Spaces.</div>
+            <div className="empty">No proposals in the matching Communities.</div>
           )}
         </div>
       )}

@@ -1,10 +1,14 @@
 import { Fingerprint, Shield, Coins } from "lucide-react";
 import type { Eligibility, GovernanceGuardReview } from "@/types/voxen";
 const labels: Record<string, string> = {
-  DRAFT: "Draft",
+  UPCOMING: "Upcoming",
+  LIVE: "Voting live",
+  ENDED: "Voting ended",
+  PUBLISHED: "Published",
+  DRAFT: "Awaiting publication",
   REVIEW: "Under review",
-  OPEN: "Voting open",
-  CLOSED: "Voting closed",
+  OPEN: "Voting live",
+  CLOSED: "Voting ended",
   FINALIZED: "Finalized",
   TIED: "Tied",
   ACTIVE: "Active",

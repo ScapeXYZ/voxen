@@ -71,7 +71,7 @@ export function CreateSpaceForm() {
             }),
           );
           setMessage(
-            "Space draft saved in this browser. No Space was deployed or activated.",
+            "Community draft saved in this browser. No Community was deployed or activated.",
           );
         } catch {
           setError(
@@ -81,10 +81,10 @@ export function CreateSpaceForm() {
       }}
     >
       <span className="eyebrow">A FOUNDATION FOR YOUR COMMUNITY</span>
-      <h2>Define your Space.</h2>
+      <h2>Define your Community.</h2>
       {hasDraft && (
         <div className="demo-notice">
-          You have a saved Space draft.{" "}
+          You have a saved Community draft.{" "}
           <button type="button" className="text-link" onClick={restoreDraft}>
             Resume saved draft
           </button>
@@ -95,7 +95,7 @@ export function CreateSpaceForm() {
       )}
       <p>Create a governance home for your community.</p>
       <label>
-        Space name
+        Community name
         <input
           required
           maxLength={80}
@@ -135,15 +135,14 @@ export function CreateSpaceForm() {
       )}
       <div className="demo-notice">
         {delegated
-          ? "Preparing a Space for another wallet? "
+          ? "Preparing a Community for another wallet? "
           : "Ownership is explicit. "}
-        This wallet must accept ownership before the Space becomes active. A
-        local draft grants no ownership.
+        Owner acceptance and whitelist enforcement require future Community integration. A local draft grants no ownership or workspace access.
       </div>
       <label>
         Constitution / rules
         <span className="small muted">
-          Write the rules Governance Guard should use when reviewing proposals.
+          Write the governance rules for this Community.
         </span>
         <textarea
           required
@@ -160,40 +159,15 @@ export function CreateSpaceForm() {
           onChange={(e) => set("permission", e.target.value)}
         >
           <option value="OWNER_ADMINS">Owner and admins</option>
-          <option value="OPEN">Open proposal creation</option>
+          <option value="OPEN">Whitelisted members</option>
         </select>
       </label>
       <p className="small muted">
         {form.permission === "OPEN"
-          ? "Anyone in the Space can create proposals. Voting is still eligibility-gated."
+          ? "Whitelisted members may create proposals if Community policy permits. Voting eligibility is checked separately."
           : "Only the owner and admins can create proposals."}
       </p>
-      <label className="check-label">
-        <input
-          type="checkbox"
-          checked={form.guard}
-          onChange={(e) => set("guard", e.target.checked)}
-        />
-        Enable Governance Guard
-      </label>
-      <label>
-        Non-compliant proposal policy
-        <select
-          disabled={!form.guard}
-          value={form.policy}
-          onChange={(e) => set("policy", e.target.value)}
-        >
-          <option value="BLOCK">Block non-compliant proposals</option>
-          <option value="WARN">Warn on non-compliant proposals</option>
-        </select>
-      </label>
-      <p className="small muted">
-        {form.guard
-          ? form.policy === "BLOCK"
-            ? "Non-compliant proposals cannot open until corrected."
-            : "Non-compliant proposals may continue with a visible warning."
-          : "Proposals will not receive a Governance Guard review."}
-      </p>
+      <p className="small muted">Governance Review will be available when this Community is connected and its rules and creator permissions can be checked.</p>
       {error && (
         <p className="form-error" role="alert">
           {error}
@@ -209,7 +183,7 @@ export function CreateSpaceForm() {
           Create on-chain · pending
         </button>
         <button type="submit" className="button primary">
-          Save local Space draft ↗
+          Save local Community draft ↗
         </button>
       </div>
     </form>

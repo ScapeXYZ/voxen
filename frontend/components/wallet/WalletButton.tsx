@@ -25,6 +25,7 @@ export function WalletButton() {
           <div className="wallet-actions">
             <span>Connected wallet</span>
             <button
+              type="button"
               className="button"
               onClick={async () => {
                 try {
@@ -41,6 +42,7 @@ export function WalletButton() {
             </button>
             <span className="mono wrap">{w.address}</span>
             <button
+              type="button"
               className="button"
               onClick={() => {
                 w.disconnectWallet();
@@ -51,6 +53,7 @@ export function WalletButton() {
             </button>
             {!w.isOnCorrectNetwork && (
               <button
+                type="button"
                 className="button"
                 disabled={w.isLoading}
                 onClick={connect}
@@ -63,6 +66,7 @@ export function WalletButton() {
         </details>
       ) : (
         <button
+          type="button"
           className="button wallet-button"
           disabled={w.isLoading}
           onClick={connect}

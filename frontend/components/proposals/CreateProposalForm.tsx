@@ -1,16 +1,23 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
 import { Plus, X, ArrowRight } from "lucide-react";
-import type { Space } from "@/types/voxen";
-const steps = [
-  "Basics",
-  "Options",
-  "Voting window",
-  "Eligibility",
-  "Governance Guard",
-  "Review",
-];
-export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
+import { useWallet } from "@/lib/genlayer/WalletProvider";
+import { WalletButton } from "@/components/wallet/WalletButton";
+import { useCreateProposal } from "@/hooks/useCreateProposal";
+import {
+  emptyProposalForm,
+  validateProposalForm,
+  smokeTestForm,
+  type ProposalForm,
+} from "@/lib/voxen/create-proposal";
+import { voteStageLabels } from "@/lib/voxen/transaction-state";
+import { SupportingReference } from "./SupportingReference";
+import { CredentialPicker } from "./CredentialPicker";
+const steps = ["Proposal details", "Voting choices", "Voting period", "Who can vote?", "Review & publish"];
+export function CreateProposalForm() {
+  const wallet = useWallet();
+  const creation = useCreateProposal();
+  const created = ["accepted", "finalized"].includes(creation.stage);
   const [step, setStep] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
   const [timezone, setTimezone] = useState("local timezone");
@@ -25,25 +32,8 @@ export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
       dateStyle: "medium",
       timeStyle: "short",
     });
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    space: "",
-    start: "",
-    end: "",
-    policy: "FINAL_ON_CAST",
-    visibility: "LIVE",
-    mode: "GEN_HOLDING",
-    minimum: "",
-    chain: "4221",
-    contract: "",
-    label: "",
-    standard: "ERC1155",
-    token: "",
-    guard: false,
-    evidence: "",
-  });
-  const [options, setOptions] = useState(["Approve", "Reject"]);
+  const [form, setForm] = useState<ProposalForm>(emptyProposalForm);
+  const [options, setOptions] = useState(["", ""]);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
@@ -59,7 +49,20 @@ export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
       );
       if (!draft?.form || !Array.isArray(draft.options))
         throw new Error("Invalid draft");
-      setForm((current) => ({ ...current, ...draft.form }));
+      const restored = { ...emptyProposalForm };
+      for (const key of Object.keys(restored) as (keyof ProposalForm)[]) {
+        if (key === "guard") restored.guard = draft.form.guard === true;
+        else if (typeof draft.form[key] === "string")
+          restored[key] = draft.form[key];
+      }
+      if (
+        !draft.options.every((value: unknown) => typeof value === "string") ||
+        draft.options.length < 2 || draft.options.length > 6
+      )
+        throw new Error("Invalid draft options");
+      restored.space = "";
+      restored.guard = false;
+      setForm(restored);
       setOptions(draft.options);
       setStep(0);
       setHasDraft(false);
@@ -70,95 +73,44 @@ export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
       );
     }
   }
-  useEffect(() => {
-    const space = new URLSearchParams(window.location.search).get("space");
-    if (space && spaces.some((s) => s.id === space))
-      setForm((f) => ({ ...f, space }));
-  }, [spaces]);
   const set = (key: keyof typeof form, value: string | boolean) => {
     setForm((f) => ({ ...f, [key]: value }));
     setSaved(false);
   };
-  const space = spaces.find((s) => s.id === form.space);
-  const validate = (s: number): string => {
-    if (s === 0 && (!form.title.trim() || !form.description.trim()))
-      return "Add a title and description.";
-    if (
-      s === 1 &&
-      (options.length < 2 ||
-        options.length > 6 ||
-        options.some((o) => !o.trim()) ||
-        new Set(options.map((o) => o.trim().toLowerCase())).size !==
-          options.length)
-    )
-      return "Provide 2–6 distinct, non-empty options.";
-    if (
-      s === 2 &&
-      (!form.start ||
-        !form.end ||
-        !Number.isFinite(Date.parse(form.start)) ||
-        !Number.isFinite(Date.parse(form.end)) ||
-        Date.parse(form.end) <= Date.parse(form.start))
-    )
-      return "Choose an end time after the start time.";
-    if (s === 3) {
-      if (
-        form.mode === "GEN_HOLDING" &&
-        (!/^\d+(\.\d{1,18})?$/.test(form.minimum) || Number(form.minimum) <= 0)
-      )
-        return "Enter a positive minimum GEN balance, up to 18 decimal places.";
-      if (
-        form.mode === "POAP_NFT" &&
-        (!/^0x[0-9a-fA-F]{40}$/.test(form.contract) ||
-          /^0x0{40}$/.test(form.contract) ||
-          !form.label.trim() ||
-          !Number.isSafeInteger(Number(form.chain)) ||
-          Number(form.chain) <= 0)
-      )
-        return "Provide a valid chain ID, non-zero contract address, and credential label.";
-      if (
-        form.mode === "POAP_NFT" &&
-        form.standard === "ERC1155" &&
-        (!/^\d+$/.test(form.token) || BigInt(form.token) > 2n ** 256n - 1n)
-      )
-        return "Enter the numeric token ID supplied by the credential collection owner.";
+  const validate = (step: number) => validateProposalForm(form, options, step);
+  function submit() {
+    if (!wallet.isConnected || !wallet.address) {
+      setError("Connect your wallet to create this proposal.");
+      return;
     }
-    if (s === 4) {
-      if (form.guard && (!space || !space.guardEnabled))
-        return "Choose a Space with Governance Guard enabled.";
-      if (form.evidence) {
-        try {
-          if (!["https:", "http:"].includes(new URL(form.evidence).protocol))
-            return "Use an HTTP or HTTPS evidence URL.";
-        } catch {
-          return "Enter a valid evidence URL.";
-        }
+    if (!wallet.isOnCorrectNetwork) {
+      setError("Switch to GenLayer Bradbury to create this proposal.");
+      return;
+    }
+    if (creation.pending || created) return;
+    for (let i = 0; i < 5; i++) {
+      const message = validateProposalForm(form, options, i, true);
+      if (message) {
+        setStep(i);
+        setError(message);
+        return;
       }
     }
-    return "";
-  };
+    setError("");
+    void creation.submit({ ...form }, [...options]);
+  }
   function next() {
     const e = validate(step);
     setError(e);
     if (!e) setStep(step + 1);
   }
   function save() {
-    for (let i = 0; i < 5; i++) {
-      const e = validate(i);
-      if (e) {
-        setStep(i);
-        setError(e);
-        return;
-      }
-    }
     try {
       localStorage.setItem(
         "voxen:proposal-draft",
         JSON.stringify({
           form,
           options,
-          startsAt: Math.floor(Date.parse(form.start) / 1000),
-          endsAt: Math.floor(Date.parse(form.end) / 1000),
           source: "local-draft",
           status: "DRAFT",
           savedAt: new Date().toISOString(),
@@ -206,8 +158,8 @@ export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
         className="panel creation-form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (step < 5) next();
-          else save();
+          if (step < 4) next();
+          else submit();
         }}
       >
         {hasDraft && (
@@ -221,7 +173,7 @@ export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
             </p>
           </div>
         )}
-        <span className="eyebrow">Step {step + 1} of 6</span>
+        <span className="eyebrow">Step {step + 1} of 5</span>
         <h2 ref={heading} tabIndex={-1}>
           {
             [
@@ -229,14 +181,34 @@ export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
               "What choices can voters select?",
               "When can people vote?",
               "Who is allowed to vote?",
-              "Should Governance Guard review this proposal?",
               "Review before submitting",
             ][step]
           }
         </h2>
         {step === 0 && (
           <>
-            <p>Give your community a clear decision to make.</p>
+            <p>
+              Create a publicly accessible proposal on Bradbury. A Community workspace is not required. You may prepare a proposal on behalf of another entity; the connected wallet remains the onchain creator.
+            </p>
+            {process.env.NODE_ENV !== "production" && <>
+            <button
+              type="button"
+              className="button"
+              disabled={creation.pending}
+              onClick={() => {
+                setForm(smokeTestForm());
+                setOptions(["Approve", "Reject"]);
+                setSaved(false);
+                setError("");
+              }}
+            >
+              Load live test settings
+            </button>
+            <p className="small muted">
+              Fills the recommended ERC1155 test with a four-hour window. Review
+              all five steps and submit manually.
+            </p>
+            </>}
             <label>
               Proposal title
               <input
@@ -257,23 +229,18 @@ export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
                 placeholder="Explain the context, intended outcome, and what happens next."
               />
             </label>
-            <label>
-              Space <span className="muted">(optional)</span>
-              <select
-                value={form.space}
-                onChange={(e) => {
-                  set("space", e.target.value);
-                  set("guard", false);
-                }}
-              >
-                <option value="">Standalone proposal</option>
-                {spaces.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} · sample
-                  </option>
-                ))}
-              </select>
-            </label>
+            <section aria-labelledby="proposal-context-heading">
+              <h3 id="proposal-context-heading">Proposal Context</h3>
+              <p>Add supporting information that helps voters understand the decision.</p>
+              <label>
+                Supporting reference (optional)
+                <input type="url" value={form.evidence} placeholder="https://..."
+                  aria-describedby="reference-help"
+                  onChange={(e) => set("evidence", e.target.value)} />
+              </label>
+              <p id="reference-help" className="small muted">Add a link to a document, discussion, announcement, research, budget, or other source that provides context for this proposal.</p>
+              <SupportingReference url={form.evidence} preview />
+            </section>
           </>
         )}
         {step === 1 && (
@@ -284,6 +251,7 @@ export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
                 <label>
                   Option {i + 1}
                   <input
+                    placeholder="Enter a choice"
                     value={o}
                     required
                     maxLength={120}
@@ -411,116 +379,26 @@ export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
               </>
             ) : (
               <>
-                <div className="field-grid">
-                  <label>
-                    Chain ID
-                    <input
-                      inputMode="numeric"
-                      value={form.chain}
-                      onChange={(e) => set("chain", e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Credential type
-                    <select
-                      value={form.standard}
-                      onChange={(e) => set("standard", e.target.value)}
-                    >
-                      <option value="ERC721">
-                        ERC721 · any credential in the collection
-                      </option>
-                      <option value="ERC1155">
-                        ERC1155 · a specific credential token
-                      </option>
-                    </select>
-                  </label>
-                </div>
-                <label>
-                  Credential contract address
-                  <input
-                    required
-                    pattern="0x[0-9a-fA-F]{40}"
-                    title="Enter the collection’s 42-character address beginning with 0x."
-                    value={form.contract}
-                    onChange={(e) => set("contract", e.target.value)}
-                    placeholder="0x…"
-                  />
-                </label>
-                <label>
-                  Credential label
-                  <input
-                    required
-                    value={form.label}
-                    onChange={(e) => set("label", e.target.value)}
-                    placeholder="Community membership"
-                  />
-                </label>
-                {form.standard === "ERC1155" && (
-                  <label>
-                    Token ID
-                    <span className="small muted">
-                      Only required when the credential uses a specific ERC1155
-                      token.
-                    </span>
-                    <input
-                      inputMode="numeric"
-                      value={form.token}
-                      onChange={(e) => set("token", e.target.value)}
-                      placeholder="501"
-                    />
-                  </label>
-                )}
-                <p className="demo-notice">
-                  Display name only. This does not determine the token ID.
-                </p>
+                <CredentialPicker
+                  form={form}
+                  onChange={(patch) => {
+                    setForm((f) => ({ ...f, ...patch }));
+                    setSaved(false);
+                    setError("");
+                  }}
+                />
               </>
             )}
           </>
         )}
         {step === 4 && (
           <>
-            <p>
-              Governance Guard compares this proposal with the Space’s rules and
-              uses validator consensus to produce a review.
-            </p>
-            <label className="check-label">
-              <input
-                type="checkbox"
-                checked={form.guard}
-                disabled={!space?.guardEnabled}
-                onChange={(e) => set("guard", e.target.checked)}
-              />
-              Enable Governance Guard
-            </label>
-            {!space?.guardEnabled && (
-              <p className="small muted">
-                Select a Guard-enabled Space in Basics to enable rule review.
-              </p>
-            )}
-            <label>
-              Evidence URL <span className="muted">(optional)</span>
-              <input
-                type="url"
-                value={form.evidence}
-                onChange={(e) => set("evidence", e.target.value)}
-                placeholder="https://…"
-              />
-            </label>
-            <div className="demo-notice">
-              {form.guard
-                ? "Review pending. Validator outcome, risk, confidence, evidence consistency, and reason will appear after a connected submission."
-                : "No Guard review. Lifecycle: Draft → Open → Closed → Finalized."}
-            </div>
-          </>
-        )}
-        {step === 5 && (
-          <>
-            <p>Check the details before saving your local draft.</p>
+            <p>Check the details before creating your proposal on Bradbury.</p>
             <h3>{form.title}</h3>
             <p className="wrap">{form.description}</p>
             <dl className="review-list">
-              <dt>Space</dt>
-              <dd>{space?.name || "Standalone"}</dd>
+              <dt>Access</dt>
+              <dd>Public proposal · voting requires proposal eligibility</dd>
               <dt>Options</dt>
               <dd>{options.join(" / ")}</dd>
               <dt>Voting window · {timezone}</dt>
@@ -568,22 +446,29 @@ export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
                   </dd>
                 </>
               )}
-              <dt>Governance Guard</dt>
-              <dd>
-                {form.guard
-                  ? `Pending review · ${space?.nonCompliantPolicy === "BLOCK" ? "Block" : "Warn about"} non-compliant proposals`
-                  : "Off"}
-              </dd>
-              <dt>Evidence</dt>
-              <dd>{form.evidence || "None"}</dd>
+              {form.evidence.trim() && <>
+                <dt>Proposal Context</dt>
+                <dd><SupportingReference url={form.evidence} /></dd>
+              </>}
             </dl>
             <div className="demo-notice">
-              Contract submission is not connected. Saving creates a local draft
-              on this browser only.
+              Creation starts this proposal in Draft. Opening voting is a
+              separate creator action; creation does not automatically open the
+              voting window. Your browser draft is retained.
             </div>
-            <button className="button full-width" type="button" disabled>
-              Submit to GenLayer · integration pending
-            </button>
+            {!wallet.isConnected ? (
+              <p role="status">Connect your wallet to create this proposal.</p>
+            ) : !wallet.isOnCorrectNetwork ? (
+              <p role="status">
+                Switch to GenLayer Bradbury to create this proposal.
+              </p>
+            ) : (
+              <p className="small">
+                Ready to submit with your connected wallet. Your wallet will
+                display the network fee.
+              </p>
+            )}
+            <WalletButton />
           </>
         )}
         {error && (
@@ -593,9 +478,79 @@ export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
         )}
         {saved && (
           <p role="status" className="success">
-            Draft saved to this browser. No on-chain proposal was created.
+            Draft saved to this browser.
           </p>
         )}
+        {creation.stage !== "idle" && (
+          <div aria-live="polite">
+            <p role="status">
+              {creation.stage === "preparing"
+                ? "Preparing proposal"
+                : voteStageLabels[creation.stage]}
+            </p>
+            {created && (
+              <>
+                <h3>Proposal created</h3>
+                <p>
+                  The transaction succeeded. The new proposal link is
+                  unavailable; you can find the transaction reference below.
+                </p>
+              </>
+            )}
+            {creation.message && <p role="alert">{creation.message}</p>}
+            {creation.monitoringError && (
+              <>
+                <p role="alert">
+                  Transaction status is temporarily unavailable. Your proposal
+                  may still be processing; do not resubmit.
+                </p>
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => void creation.retryStatus()}
+                >
+                  Retry transaction status
+                </button>
+              </>
+            )}
+            <details>
+              <summary>Transaction details</summary>
+              {created && (
+                <p>
+                  The installed SDK returns a transaction ID, not a decoded
+                  proposal ID. No proposal ID has been guessed.
+                </p>
+              )}
+              <p className="mono wrap">
+                Wallet transaction: {creation.evmHash || "Not submitted"}
+              </p>
+              <p className="mono wrap">
+                GenLayer transaction: {creation.txId || "Not available yet"}
+              </p>
+              <p className="small wrap">
+                {creation.monitoringError || creation.technical}
+              </p>
+            </details>
+          </div>
+        )}
+        {created && (
+          <button
+            type="button"
+            className="button"
+            onClick={() => {
+              creation.startAnother();
+              setStep(0);
+              setForm(emptyProposalForm);
+              setOptions(["", ""]);
+              setSaved(false);
+            }}
+          >
+            Start another proposal
+          </button>
+        )}
+        <button type="button" className="button" onClick={save}>
+          Save local draft
+        </button>
         <div className="form-actions">
           <button
             className="button"
@@ -608,8 +563,16 @@ export function CreateProposalForm({ spaces }: { spaces: Space[] }) {
           >
             Back
           </button>
-          <button type="submit" className="button primary">
-            {step === 5 ? "Save local draft" : "Continue"}
+          <button
+            type="submit"
+            className="button primary"
+            disabled={
+              creation.pending ||
+              (step === 4 &&
+                (created || !wallet.isConnected || !wallet.isOnCorrectNetwork))
+            }
+          >
+            {step === 4 ? "Create proposal" : "Continue"}
             <ArrowRight size={16} />
           </button>
         </div>

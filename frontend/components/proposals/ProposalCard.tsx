@@ -1,3 +1,6 @@
+"use client";
+import { useVotingClock } from "@/hooks/useVotingClock";
+import { votingState, scheduleLabel } from "@/lib/voxen/lifecycle";
 import { sampleSpaces } from "@/lib/voxen/sample-data";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
@@ -8,25 +11,30 @@ import {
   GovernanceGuardBadge,
 } from "@/components/governance/Badges";
 export function ProposalCard({ proposal: p }: { proposal: Proposal }) {
+  const now = useVotingClock();
+  const state = votingState(p, now);
   return (
     <Link href={`/proposals/${p.id}`} className="proposal-card">
       <div className="row">
-        <StatusBadge status={p.status} />
+        <StatusBadge status={state} />
         <ArrowUpRight size={17} />
       </div>
       <h3>{p.title}</h3>
       <p className="small">
-        {sampleSpaces.find((s) => s.id === p.spaceId)?.name ||
-          "Standalone proposal"}
+        {(p.source === "demo" ? sampleSpaces.find((s) => s.id === p.spaceId)?.name : p.communityId) || "Public proposal"}
       </p>
       <p>{p.description}</p>
+      <p>{scheduleLabel(p, now)}</p>
+      <p className="small">Starts {new Date(p.startsAt).toLocaleString()} · Ends {new Date(p.endsAt).toLocaleString()}</p>
+      {p.result && <p>Final result: {p.result}</p>}
+      {state === "ENDED" && <p>{p.talliesHidden ? "Tally unavailable" : p.options.map((o) => `${o.label}: ${o.votes}`).join(" · ")} · Awaiting finalization</p>}
       <div className="card-tags">
         <EligibilityBadge eligibility={p.eligibility} />
         <GovernanceGuardBadge review={p.guard} />
       </div>
       <div className="card-foot">
         <span>{p.participation} participants</span>
-        <span>Sample proposal</span>
+        <span>{p.source === "demo" ? "Sample/demo" : state === "LIVE" ? "View & vote" : "View proposal"}</span>
       </div>
     </Link>
   );
@@ -37,7 +45,7 @@ export function ProposalNode({ proposal }: { proposal: Proposal }) {
       <div className="row">
         <span className="eyebrow">
           {sampleSpaces.find((s) => s.id === proposal.spaceId)?.name ||
-            "Standalone"}
+            "Public proposal"}
         </span>
         <StatusBadge status={proposal.status} />
       </div>

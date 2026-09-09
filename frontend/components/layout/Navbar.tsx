@@ -26,9 +26,8 @@ export function Navbar() {
         >
           {[
             ["/explore", "Explore"],
-            ["/spaces", "Spaces"],
+            ["/communities", "Communities"],
             ["/create", "Create Proposal"],
-            ["/create-space", "Create Space"],
             ["/live-proof", "Live Proof"],
           ].map(([href, label]) => (
             <Link
@@ -50,15 +49,15 @@ export function Navbar() {
         <span className="mobile-route">
           {path.startsWith("/proposals/")
             ? "Proposal"
-            : path.startsWith("/spaces/")
-              ? "Space details"
+            : path.startsWith("/communities/")
+              ? "Community details"
               : (
                   {
                     "/": "Home",
                     "/explore": "Explore",
-                    "/spaces": "Spaces",
+                    "/communities": "Communities",
                     "/create": "Create Proposal",
-                    "/create-space": "Create Space",
+                    "/create-community": "Create Community",
                     "/live-proof": "Live Proof",
                   } as Record<string, string>
                 )[path]}

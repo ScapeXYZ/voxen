@@ -9,7 +9,7 @@ export function Footer() {
       </div>
       <div className="footer-links">
         <Link href="/explore">Explore the network ↗</Link>
-        <Link href="/spaces">Spaces ↗</Link>
+        <Link href="/communities">Communities ↗</Link>
         <Link href="/live-proof">Live Proof ↗</Link>
         <span>Built on GenLayer</span>
         <details>

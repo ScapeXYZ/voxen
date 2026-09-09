@@ -30,9 +30,7 @@ export default function Home() {
           </h1>
           <div className="hero-copy">
             <p>
-              Voxen helps communities make decisions. Create proposals, verify
-              who can vote, and use GenLayer consensus to review governance
-              rules.
+              Browse public proposals without joining a Community. Connect your wallet to check eligibility and vote. Community workspaces unlock separately for whitelisted wallets.
             </p>
             <div className="actions">
               <Link href="/explore" className="button primary">
@@ -54,7 +52,7 @@ export default function Home() {
         <div className="hero-caption">
           <span>A better way to move forward, together.</span>
           <span>
-            PERMISSIONLESS SPACES <i /> VERIFIED PARTICIPATION <i /> SHARED
+            PUBLIC VOTING <i /> VERIFIED PARTICIPATION <i /> SHARED
             DECISIONS
           </span>
         </div>
@@ -84,7 +82,7 @@ export default function Home() {
               {
                 icon: Shield,
                 title: "Your rules, in the loop.",
-                text: "Give your Space a constitution. Governance Guard reviews proposals against the principles your community sets.",
+                text: "Give your Community a constitution. Governance Guard reviews proposals against the principles your community sets.",
               },
               {
                 icon: GitBranch,
@@ -167,8 +165,8 @@ export default function Home() {
                 GenLayer validator consensus assesses alignment, risk, and
                 evidence before a decision moves forward.
               </p>
-              <Link href="/create-space" className="text-link">
-                Build your Space <ArrowUpRight size={16} />
+              <Link href="/create-community" className="text-link">
+                Build your Community <ArrowUpRight size={16} />
               </Link>
             </div>
           </div>
@@ -199,7 +197,7 @@ export default function Home() {
           <div className="guard-note">
             <Shield size={16} />
             <span>
-              Your Space chooses whether non-compliant proposals are blocked or
+              Your Community chooses whether non-compliant proposals are blocked or
               flagged. Ties remain tied. No AI tie-breaking.
             </span>
           </div>
@@ -211,8 +209,8 @@ export default function Home() {
       <section className="closing shell">
         <span className="eyebrow">YOUR COMMUNITY. YOUR NEXT CHAPTER.</span>
         <h2>Make room for better decisions.</h2>
-        <Link href="/create-space" className="button primary">
-          Create a Space <ArrowUpRight size={16} />
+        <Link href="/create-community" className="button primary">
+          Create a Community <ArrowUpRight size={16} />
         </Link>
       </section>
     </main>

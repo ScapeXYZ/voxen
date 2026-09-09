@@ -1,3 +1,4 @@
+import { LiveProposalView } from "@/components/proposals/LiveProposalView";
 import { LiveProofPanel } from "@/components/governance/LiveProofPanel";
 import { BRADBURY } from "@/lib/voxen/config";
 export default function Proof() {
@@ -15,6 +16,7 @@ export default function Proof() {
         <span className="badge status-open">BRADBURY TESTNET</span>
       </div>
       <LiveProofPanel full />
+      <LiveProposalView id="proposal-3" compact />
       <section className="detail-section">
         <span className="eyebrow">01 / HOLDER PATH · PROPOSAL-3</span>
         <h2>A credential opened the door.</h2>
@@ -61,8 +63,8 @@ export default function Proof() {
           <p className="muted">
             This is a specific testnet execution, not an audit or a guarantee of
             all eligibility modes, credentials, or security properties.
-            Transaction hashes and block references were not supplied. No
-            current chain state is claimed.
+            Transaction hashes and block references were not supplied. Current
+            contract state is queried separately above.
           </p>
         </div>
         <details className="panel">

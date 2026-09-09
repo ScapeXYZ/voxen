@@ -1,6 +1,6 @@
-import type { Space, Proposal } from "@/types/voxen";
+import type { Community, Proposal } from "@/types/voxen";
 const owner = "0x1234567890aBcDEF1234567890abCDef12345678";
-export const sampleSpaces: Space[] = [
+export const sampleSpaces: Community[] = [
   {
     id: "commons",
     name: "The Commons",
@@ -65,7 +65,7 @@ export const sampleProposals: Proposal[] = [
       confidence: 94,
       evidenceConsistency: "Consistent with the proposed scope",
       reason:
-        "The proposal names a budget, delivery milestones, and public reporting requirements, consistent with the Space constitution.",
+        "The proposal names a budget, delivery milestones, and public reporting requirements, consistent with the Community constitution.",
     },
     voteChangePolicy: "CHANGE_UNTIL_CLOSE",
     resultVisibility: "LIVE",

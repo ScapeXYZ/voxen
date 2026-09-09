@@ -1,46 +1,25 @@
 "use client";
-import { useState, useEffect } from "react";
 import { Fingerprint } from "lucide-react";
 import { useWallet } from "@/lib/genlayer/WalletProvider";
 import { WalletButton } from "@/components/wallet/WalletButton";
-import { checkEligibility, type EligibilityResult } from "@/lib/voxen/data";
+import type { EligibilityCheck } from "@/hooks/useVoxenEligibility";
 import type { Eligibility } from "@/types/voxen";
 export function EligibilityPanel({
   eligibility: e,
+  live = false,
+  check,
 }: {
   eligibility: Eligibility;
+  live?: boolean;
+  check?: EligibilityCheck;
 }) {
   const wallet = useWallet();
-  const [result, setResult] = useState<EligibilityResult>();
-  const [checking, setChecking] = useState(false);
-  const [retry, setRetry] = useState(0);
-  const [failure, setFailure] = useState("");
-  useEffect(() => {
-    let cancelled = false;
-    setResult(undefined);
-    setFailure("");
-    setChecking(false);
-    if (wallet.address && wallet.isOnCorrectNetwork) {
-      setChecking(true);
-      checkEligibility(wallet.address, e)
-        .then((r) => {
-          if (!cancelled) setResult(r);
-        })
-        .catch((err) => {
-          if (!cancelled) setFailure(String(err));
-        })
-        .finally(() => {
-          if (!cancelled) setChecking(false);
-        });
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [wallet.address, wallet.chainId, wallet.isOnCorrectNetwork, e, retry]);
+  const failure = check?.error?.message;
   return (
     <section className="eligibility-panel">
       <Fingerprint size={22} />
-      <h3>Who can vote?</h3>
+      <h3>{e.mode === "POAP_NFT" ? "Required credential" : "Who can vote?"}</h3>
+      {e.mode === "POAP_NFT" && <strong className="wrap">{e.label}</strong>}
       <p>
         {e.mode === "GEN_HOLDING"
           ? `To vote, your wallet must hold at least ${e.minimum} GEN.`
@@ -78,23 +57,47 @@ export function EligibilityPanel({
       )}
       <p role="status">
         {!wallet.isConnected
-          ? "Connect your wallet to check whether you can vote. This sample cannot verify eligibility yet."
+          ? "Connect your wallet to check whether you can vote."
           : !wallet.isOnCorrectNetwork
             ? "Switch to GenLayer Bradbury to continue."
-            : checking
-              ? "Checking your voting eligibility…"
+            : check?.isFetching
+              ? e.mode === "POAP_NFT"
+                ? "Checking credential ownership..."
+                : "Checking your voting eligibility..."
               : failure
                 ? "We couldn't verify your voting eligibility. Try again."
-                : result?.status === "eligible"
-                  ? "You're eligible to vote."
-                  : result?.status === "ineligible"
-                    ? "You're not eligible for this proposal."
-                    : "Eligibility unavailable: live checks are not connected for this sample."}
+                : check?.data?.eligible === true
+                  ? "Eligible to vote"
+                  : check?.data?.eligible === false
+                    ? e.mode === "POAP_NFT"
+                      ? "This wallet does not hold the required credential."
+                      : "You're not eligible for this proposal."
+                    : live
+                      ? e.mode === "POAP_NFT"
+                        ? "Checking credential ownership..."
+                        : "Checking your voting eligibility..."
+                      : "Eligibility unavailable: live checks are not connected for this sample."}
       </p>
+      {live && (
+        <p className="small muted">
+          This is a balance preview. The contract checks your eligibility again
+          when your vote executes. Network fees may apply.
+        </p>
+      )}
+      {check?.data && (
+        <details>
+          <summary>Verification details</summary>
+          <p className="small">
+            Observed balance: {check.data.observedBalance}
+            {e.mode === "GEN_HOLDING" ? " wei" : " tokens"}. Checked{" "}
+            {check.data.checkedAt}.
+          </p>
+        </details>
+      )}
       <WalletButton />
       {failure && (
         <>
-          <button className="button" onClick={() => setRetry(retry + 1)}>
+          <button className="button" onClick={() => void check?.refetch()}>
             Try again
           </button>
           <details>
