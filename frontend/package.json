@@ -1,7 +1,7 @@
 {
-  "name": "genlayer-football-betting",
+  "name": "voxen",
   "version": "1.0.0",
-  "description": "GenLayer Football Betting - AI-powered prediction betting on GenLayer blockchain.",
+  "description": "Voxen \u2014 eligibility-gated governance on GenLayer",
   "main": "index.js",
   "scripts": {
     "dev": "next dev",

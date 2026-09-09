@@ -224,7 +224,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         });
       } else {
         error("Failed to connect wallet", {
-          description: err.message || "Please check your MetaMask and try again."
+          description: "Check your wallet and try again. Technical details are available next to the wallet button."
         });
       }
 

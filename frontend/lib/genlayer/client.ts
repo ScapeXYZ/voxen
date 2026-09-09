@@ -1,23 +1,14 @@
 "use client";
 
-import { createClient } from "genlayer-js";
-import { studionet } from "genlayer-js/chains";
-import { createWalletClient, custom, type WalletClient } from "viem";
+import { voxenConfig } from "@/lib/voxen/config";
 
-// GenLayer Network Configuration (from environment variables with fallbacks)
-export const GENLAYER_CHAIN_ID = parseInt(process.env.NEXT_PUBLIC_GENLAYER_CHAIN_ID || "61999");
-export const GENLAYER_CHAIN_ID_HEX = `0x${GENLAYER_CHAIN_ID.toString(16).toUpperCase()}`;
-
+export const GENLAYER_CHAIN_ID = voxenConfig.chainId;
+export const GENLAYER_CHAIN_ID_HEX = `0x${GENLAYER_CHAIN_ID.toString(16)}`;
 export const GENLAYER_NETWORK = {
   chainId: GENLAYER_CHAIN_ID_HEX,
-  chainName: process.env.NEXT_PUBLIC_GENLAYER_CHAIN_NAME || "GenLayer Studio",
-  nativeCurrency: {
-    name: process.env.NEXT_PUBLIC_GENLAYER_SYMBOL || "GEN",
-    symbol: process.env.NEXT_PUBLIC_GENLAYER_SYMBOL || "GEN",
-    decimals: 18,
-  },
-  rpcUrls: [process.env.NEXT_PUBLIC_GENLAYER_RPC_URL || "https://studio.genlayer.com/api"],
-  blockExplorerUrls: [],
+  chainName: "GenLayer EVM",
+  nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 },
+  rpcUrls: [voxenConfig.evmRpc],
 };
 
 // Ethereum provider type from window
@@ -32,27 +23,6 @@ declare global {
   interface Window {
     ethereum?: EthereumProvider;
   }
-}
-
-/**
- * Get the GenLayer RPC URL from environment variables
- */
-export function getStudioUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_GENLAYER_RPC_URL || "https://studio.genlayer.com/api"
-  );
-}
-
-/**
- * Get the contract address from environment variables
- */
-export function getContractAddress(): string {
-  const address = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
-  if (!address) {
-    // Return empty string during build, error will be shown in UI during runtime
-    return "";
-  }
-  return address;
 }
 
 /**
@@ -267,61 +237,4 @@ export async function switchAccount(): Promise<string> {
     }
     throw new Error(`Failed to switch account: ${error.message}`);
   }
-}
-
-/**
- * Create a viem wallet client from MetaMask provider
- */
-export function createMetaMaskWalletClient(): WalletClient | null {
-  const provider = getEthereumProvider();
-
-  if (!provider) {
-    return null;
-  }
-
-  try {
-    return createWalletClient({
-      chain: studionet as any,
-      transport: custom(provider),
-    });
-  } catch (error) {
-    console.error("Error creating wallet client:", error);
-    return null;
-  }
-}
-
-/**
- * Create a GenLayer client with MetaMask account
- *
- * Note: The genlayer-js SDK doesn't directly support custom transports like viem.
- * When an address is provided, the SDK will use the window.ethereum provider
- * automatically for transaction signing via MetaMask.
- */
-export function createGenLayerClient(address?: string) {
-  const config: any = {
-    chain: studionet,
-  };
-
-  if (address) {
-    config.account = address as `0x${string}`;
-  }
-
-  try {
-    return createClient(config);
-  } catch (error) {
-    console.error("Error creating GenLayer client:", error);
-    // Return client without account on error
-    return createClient({
-      chain: studionet,
-    });
-  }
-}
-
-/**
- * Get a client instance with MetaMask account
- */
-export async function getClient() {
-  const accounts = await getAccounts();
-  const address = accounts[0];
-  return createGenLayerClient(address);
 }
