@@ -7,6 +7,10 @@ import {
   ScanLine,
   ArrowRight,
   Coins,
+  BadgeCheck,
+  WalletCards,
+  ShieldCheck,
+  Network,
 } from "lucide-react";
 import { GovernanceGraph } from "@/components/governance/GovernanceGraph";
 import { LiveExplore } from "@/components/proposals/LiveExplore";
@@ -24,13 +28,13 @@ export default function Home() {
         </div>
         <div className="hero-heading">
           <h1>
-            Decisions, governed
+            From proposal to <span>consensus</span>
             <br />
-            by <span>consensus.</span>
+            onchain.
           </h1>
           <div className="hero-copy">
             <p>
-              Browse public decisions without a wallet. Connect only when you want the contract to check whether you can vote.
+              Create proposals, verify eligibility, review decisions through GenLayer consensus, and finalize outcomes onchain.
             </p>
             <div className="actions">
               <Link href="/explore" className="button primary">
@@ -43,10 +47,15 @@ export default function Home() {
           </div>
         </div>
         <ul className="trust-strip" aria-label="Voxen features">
-          <li>Eligibility-gated voting</li>
-          <li>One wallet, one vote</li>
-          <li>Governance Guard</li>
-          <li>GenLayer consensus</li>
+          {[
+            [BadgeCheck, "Eligibility-gated voting", "Only verified participants can vote."],
+            [WalletCards, "One wallet, one vote", "Equal participation for each eligible wallet."],
+            [ShieldCheck, "Governance Guard", "Rules inform proposal review."],
+            [Network, "GenLayer consensus", "Independent validators assess together."],
+          ].map(([Icon, title, text]) => {
+            const FeatureIcon = Icon as typeof BadgeCheck;
+            return <li key={title as string}><FeatureIcon size={18} aria-hidden="true" /><span><strong>{title as string}</strong><small>{text as string}</small></span></li>;
+          })}
         </ul>
         <GovernanceGraph />
         <div className="hero-caption">
