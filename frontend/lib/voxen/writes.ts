@@ -5,7 +5,7 @@ import { createProposalArgs, type ProposalForm } from "./create-proposal";
 import { testnetBradbury } from "genlayer-js/chains";
 import { getEthereumProvider } from "@/lib/genlayer/client";
 import { voxenConfig } from "./config";
-import type { LiveProposal, getVote } from "./reads";
+import type { LiveProposal } from "./reads";
 import type { VoteStage } from "./transaction-state";
 import { fetchEligibility } from "./eligibility-client";
 
@@ -28,22 +28,14 @@ export async function submitVote(
       throw new Error("Could not refresh proposal before voting");
     return response.json();
   };
-  const [live, recorded, eligibility] = await Promise.all([
+  const [live, eligibility] = await Promise.all([
     read<LiveProposal>(""),
-    read<{ vote: Awaited<ReturnType<typeof getVote>> }>(
-      `?wallet=${encodeURIComponent(wallet)}`,
-    ),
     fetchEligibility(id, wallet),
   ]);
   const p = live.proposal;
   const assertWindow = () => {
     const now = Date.now() / 1000;
-    if (p.status !== "PUBLISHED" && p.status !== "OPEN") throw new Error("Proposal is not published");
-    if (
-      live.timeWindow.window !== "WITHIN" ||
-      now < live.timeWindow.start ||
-      now >= live.timeWindow.end
-    )
+    if (p.status !== "PUBLISHED" || now < Date.parse(p.startsAt) / 1000 || now >= Date.parse(p.endsAt) / 1000)
       throw new Error("Outside voting window");
   };
   assertWindow();
@@ -53,10 +45,6 @@ export async function submitVote(
     optionIndex >= p.options.length
   )
     throw new Error("Invalid option index");
-  if (recorded.vote && p.voteChangePolicy === "FINAL_ON_CAST")
-    throw new Error("Vote is final");
-  if (recorded.vote?.optionIndex === optionIndex)
-    throw new Error("Same option is a no-op");
   if (!eligibility.eligible) throw new Error("Eligibility not verified");
   await submitContractWrite(
     wallet,
@@ -74,7 +62,7 @@ type WriteUpdate = (state: {
 }) => void;
 async function submitContractWrite(
   wallet: string,
-  functionName: "cast_vote" | "create_proposal",
+  functionName: "cast_vote" | "create_proposal" | "transition_proposal" | "request_governance_review",
   args: CalldataEncodable[],
   update: WriteUpdate,
   beforeSend: () => void,
@@ -151,4 +139,11 @@ export async function createProposal(
   await submitContractWrite(wallet, "create_proposal", args, update, () => {
     createProposalArgs(form, options);
   });
+}
+
+export async function transitionProposal(id: string, status: "PUBLISHED" | "FINALIZED", wallet: string, update: WriteUpdate) {
+  await submitContractWrite(wallet, "transition_proposal", [id, status], update, () => undefined);
+}
+export async function requestGovernanceReview(id: string, wallet: string, update: WriteUpdate) {
+  await submitContractWrite(wallet, "request_governance_review", [id], update, () => undefined);
 }

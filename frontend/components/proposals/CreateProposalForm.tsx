@@ -7,7 +7,6 @@ import { useCreateProposal } from "@/hooks/useCreateProposal";
 import {
   emptyProposalForm,
   validateProposalForm,
-  smokeTestForm,
   type ProposalForm,
 } from "@/lib/voxen/create-proposal";
 import { voteStageLabels } from "@/lib/voxen/transaction-state";
@@ -35,47 +34,8 @@ export function CreateProposalForm() {
   const [form, setForm] = useState<ProposalForm>(emptyProposalForm);
   const [options, setOptions] = useState(["", ""]);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState(false);
-  const [hasDraft, setHasDraft] = useState(false);
-  useEffect(() => {
-    try {
-      setHasDraft(!!localStorage.getItem("voxen:proposal-draft"));
-    } catch {}
-  }, []);
-  function restoreDraft() {
-    try {
-      const draft = JSON.parse(
-        localStorage.getItem("voxen:proposal-draft") || "null",
-      );
-      if (!draft?.form || !Array.isArray(draft.options))
-        throw new Error("Invalid draft");
-      const restored = { ...emptyProposalForm };
-      for (const key of Object.keys(restored) as (keyof ProposalForm)[]) {
-        if (key === "guard") restored.guard = draft.form.guard === true;
-        else if (typeof draft.form[key] === "string")
-          restored[key] = draft.form[key];
-      }
-      if (
-        !draft.options.every((value: unknown) => typeof value === "string") ||
-        draft.options.length < 2 || draft.options.length > 6
-      )
-        throw new Error("Invalid draft options");
-      restored.space = "";
-      restored.guard = false;
-      setForm(restored);
-      setOptions(draft.options);
-      setStep(0);
-      setHasDraft(false);
-      setError("");
-    } catch {
-      setError(
-        "We couldn't open this saved draft. You can start a new one below.",
-      );
-    }
-  }
   const set = (key: keyof typeof form, value: string | boolean) => {
     setForm((f) => ({ ...f, [key]: value }));
-    setSaved(false);
   };
   const validate = (step: number) => validateProposalForm(form, options, step);
   function submit() {
@@ -103,26 +63,6 @@ export function CreateProposalForm() {
     const e = validate(step);
     setError(e);
     if (!e) setStep(step + 1);
-  }
-  function save() {
-    try {
-      localStorage.setItem(
-        "voxen:proposal-draft",
-        JSON.stringify({
-          form,
-          options,
-          source: "local-draft",
-          status: "DRAFT",
-          savedAt: new Date().toISOString(),
-        }),
-      );
-      setSaved(true);
-      setError("");
-    } catch {
-      setError(
-        "Local storage is unavailable. Your draft remains in this form.",
-      );
-    }
   }
   return (
     <div className="form-layout">
@@ -162,17 +102,6 @@ export function CreateProposalForm() {
           else submit();
         }}
       >
-        {hasDraft && (
-          <div className="demo-notice">
-            You have a saved proposal draft.{" "}
-            <button type="button" className="text-link" onClick={restoreDraft}>
-              Resume saved draft
-            </button>
-            <p className="small">
-              Saving a new draft replaces the previous one in this browser.
-            </p>
-          </div>
-        )}
         <span className="eyebrow">Step {step + 1} of 5</span>
         <h2 ref={heading} tabIndex={-1}>
           {
@@ -190,25 +119,6 @@ export function CreateProposalForm() {
             <p>
               Create a publicly accessible proposal on Bradbury. A Community workspace is not required. You may prepare a proposal on behalf of another entity; the connected wallet remains the onchain creator.
             </p>
-            {process.env.NODE_ENV !== "production" && <>
-            <button
-              type="button"
-              className="button"
-              disabled={creation.pending}
-              onClick={() => {
-                setForm(smokeTestForm());
-                setOptions(["Approve", "Reject"]);
-                setSaved(false);
-                setError("");
-              }}
-            >
-              Load live test settings
-            </button>
-            <p className="small muted">
-              Fills the recommended ERC1155 test with a four-hour window. Review
-              all five steps and submit manually.
-            </p>
-            </>}
             <label>
               Proposal title
               <input
@@ -345,7 +255,7 @@ export function CreateProposalForm() {
             <fieldset className="mode-picker">
               <legend>Eligibility mode</legend>
               {[
-                ["GEN_HOLDING", "GEN holding"],
+                ["GEN", "GEN holding"],
                 ["POAP_NFT", "NFT / POAP credential"],
               ].map(([v, l]) => (
                 <label key={v}>
@@ -359,7 +269,7 @@ export function CreateProposalForm() {
                 </label>
               ))}
             </fieldset>
-            {form.mode === "GEN_HOLDING" ? (
+            {form.mode === "GEN" ? (
               <>
                 <label>
                   Minimum GEN balance
@@ -383,7 +293,6 @@ export function CreateProposalForm() {
                   form={form}
                   onChange={(patch) => {
                     setForm((f) => ({ ...f, ...patch }));
-                    setSaved(false);
                     setError("");
                   }}
                 />
@@ -421,7 +330,7 @@ export function CreateProposalForm() {
               <dd>
                 {form.mode === "GEN_HOLDING"
                   ? `Holding at least ${form.minimum} GEN`
-                  : `Hold the ${form.label} community credential`}
+                  : `Hold the selected NFT / POAP credential`}
               </dd>
               {form.mode === "POAP_NFT" && (
                 <>
@@ -431,8 +340,6 @@ export function CreateProposalForm() {
                       <summary>Technical details</summary>
                       <p className="wrap">
                         Collection: {form.contract}
-                        <br />
-                        Chain ID: {form.chain}
                         <br />
                         Standard: {form.standard}
                         {form.standard === "ERC1155" && (
@@ -452,9 +359,8 @@ export function CreateProposalForm() {
               </>}
             </dl>
             <div className="demo-notice">
-              Creation starts this proposal in Draft. Opening voting is a
-              separate creator action; creation does not automatically open the
-              voting window. Your browser draft is retained.
+              Ordinary proposals publish immediately. Community Guard proposals
+              enter Review and require a current COMPLIANT Governance Review before publication.
             </div>
             {!wallet.isConnected ? (
               <p role="status">Connect your wallet to create this proposal.</p>
@@ -474,11 +380,6 @@ export function CreateProposalForm() {
         {error && (
           <p className="form-error" role="alert">
             {error}
-          </p>
-        )}
-        {saved && (
-          <p role="status" className="success">
-            Draft saved to this browser.
           </p>
         )}
         {creation.stage !== "idle" && (
@@ -542,15 +443,11 @@ export function CreateProposalForm() {
               setStep(0);
               setForm(emptyProposalForm);
               setOptions(["", ""]);
-              setSaved(false);
             }}
           >
             Start another proposal
           </button>
         )}
-        <button type="button" className="button" onClick={save}>
-          Save local draft
-        </button>
         <div className="form-actions">
           <button
             className="button"

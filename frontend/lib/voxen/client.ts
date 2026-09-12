@@ -16,10 +16,12 @@ export async function readVoxen(
     | "get_proposal_ids"
     | "get_proposal"
     | "get_proposal_eligibility"
-    | "get_proposal_time_window"
     | "get_proposal_tallies"
     | "get_proposal_result"
-    | "get_vote",
+    | "check_eligibility"
+    | "get_space"
+    | "get_governance_review"
+    | "get_latest_governance_review",
   args: (string | number)[],
 ): Promise<unknown> {
   let timer: ReturnType<typeof setTimeout> | undefined;

@@ -9,7 +9,7 @@ import {
   Coins,
 } from "lucide-react";
 import { GovernanceGraph } from "@/components/governance/GovernanceGraph";
-import { LiveProofPanel } from "@/components/governance/LiveProofPanel";
+import { LiveExplore } from "@/components/proposals/LiveExplore";
 export default function Home() {
   return (
     <main id="main">
@@ -30,7 +30,7 @@ export default function Home() {
           </h1>
           <div className="hero-copy">
             <p>
-              Browse public proposals without joining a Community. Connect your wallet to check eligibility and vote. Community workspaces unlock separately for whitelisted wallets.
+              Browse public decisions without a wallet. Connect only when you want the contract to check whether you can vote.
             </p>
             <div className="actions">
               <Link href="/explore" className="button primary">
@@ -92,7 +92,7 @@ export default function Home() {
               {
                 icon: ScanLine,
                 title: "Decisions you can trace.",
-                text: "Follow a proposal from draft to finalization, with clear policies, participation, and outcomes.",
+                text: "Follow a proposal from review through voting to a final onchain outcome.",
               },
             ].map((f, i) => (
               <article key={f.title}>
@@ -165,8 +165,8 @@ export default function Home() {
                 GenLayer validator consensus assesses alignment, risk, and
                 evidence before a decision moves forward.
               </p>
-              <Link href="/create-community" className="text-link">
-                Build your Community <ArrowUpRight size={16} />
+              <Link href="/communities" className="text-link">
+                Understand Communities <ArrowUpRight size={16} />
               </Link>
             </div>
           </div>
@@ -204,7 +204,7 @@ export default function Home() {
         </div>
       </section>
       <section className="shell proof-section">
-        <LiveProofPanel />
+        <LiveExplore />
       </section>
       <section className="closing shell">
         <span className="eyebrow">YOUR COMMUNITY. YOUR NEXT CHAPTER.</span>

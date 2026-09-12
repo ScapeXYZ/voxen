@@ -39,10 +39,8 @@ export function GovernanceReview({ p, space }: { p: Proposal; space?: Community 
                 <h4>Evidence consistency</h4>
                 <p>{p.guard.evidenceConsistency}</p>
                 <p className="small muted">
-                  {p.source === "demo" ? "Sample validator review" : "Validator review"} ·{" "}
-                  {space?.nonCompliantPolicy === "BLOCK"
-                    ? "Non-compliant proposals are blocked."
-                    : "Non-compliant proposals receive a warning."}
+                  Independent GenLayer validators evaluate whether this proposal follows
+                  the Community’s governance rules.
                 </p>
               </>
             ) : (

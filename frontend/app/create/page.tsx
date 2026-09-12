@@ -6,7 +6,7 @@ export default async function Create() {
       <h1>Create a proposal.</h1>
       <p className="page-subtitle">
         A proposal is a question for your community to decide by voting. Prepare
-        a draft in six steps, then create a public proposal on Bradbury.
+        a proposal in five steps, then submit it to Bradbury.
       </p>
       <CreateProposalForm />
     </main>

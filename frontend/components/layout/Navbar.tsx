@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { VoxenLogo } from "./VoxenLogo";
 import { WalletButton } from "@/components/wallet/WalletButton";
+import { ThemeToggle } from "./ThemeToggle";
 export function Navbar() {
   const path = usePathname();
   const [open, setOpen] = useState(false);
@@ -45,6 +46,7 @@ export function Navbar() {
             </Link>
           ))}
         </nav>
+        <ThemeToggle />
         <WalletButton />
         <span className="mobile-route">
           {path.startsWith("/proposals/")

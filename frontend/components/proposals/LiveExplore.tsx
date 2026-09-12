@@ -22,11 +22,16 @@ export function LiveExplore() {
   const proposals = [...new Map((query.data?.pages.flatMap((page) => page.proposals) ?? []).map((p) => [p.id, p])).values()];
   const visible = proposals.filter((p) => {
     const state = votingState(p, now);
-    return filter === "All" || (filter === "Live" && state === "LIVE") || (filter === "Upcoming" && state === "UPCOMING") || (filter === "Ended" && ["ENDED", "FINALIZED"].includes(state));
+    return filter === "All" ||
+      (filter === "Live" && state === "LIVE") ||
+      (filter === "Upcoming" && state === "UPCOMING") ||
+      (filter === "Ended" && state === "ENDED") ||
+      (filter === "Finalized" && state === "FINALIZED") ||
+      (filter === "Under Review" && state === "REVIEW");
   });
   return <>
     <p className="small">Newest first · Filters apply to loaded proposals.</p>
-    <div className="row" role="group" aria-label="Proposal filters">{["All", "Live", "Upcoming", "Ended"].map((label) => <button key={label} className="button" aria-pressed={filter === label} onClick={() => setFilter(label)}>{label}</button>)}</div>
+    <div className="row" role="group" aria-label="Proposal filters">{["All", "Live", "Upcoming", "Ended", "Finalized", "Under Review"].map((label) => <button key={label} className="button" aria-pressed={filter === label} onClick={() => setFilter(label)}>{label}</button>)}</div>
     {query.isPending && <p role="status">Discovering live proposals…</p>}
     {query.isError ? <p role="alert">{query.error.message}</p> : <div className="proposal-grid">{visible.map((p) => <ProposalCard key={p.id} proposal={p} />)}</div>}
     {query.isSuccess && !visible.length && <p>No {filter.toLowerCase()} proposals in the loaded pages.</p>}

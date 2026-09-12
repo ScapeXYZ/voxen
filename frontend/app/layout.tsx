@@ -3,6 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import Script from "next/script";
 export const metadata: Metadata = {
   title: {
     default: "Voxen — Decisions, governed by consensus.",
@@ -20,7 +21,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script id="theme-preference" strategy="beforeInteractive">{`try { const saved = localStorage.getItem('voxen-theme'); const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; document.documentElement.dataset.theme = dark ? 'dark' : 'light'; } catch {}`}</Script>
+      </head>
       <body>
         <Providers>
           <a className="skip-link" href="#main">

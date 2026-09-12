@@ -1,6 +1,6 @@
 /** Explicit application trust configuration; wallet chain ID alone does not identify Bradbury. */
 export const BRADBURY = {
-  contract: "0xA7c7B3F81dbbC511029a9A07FDfBf97dC1A822f7",
+  contract: "0x7E9A12C4e2a53A760065E98BeF726741334A4D89",
   rpc: "https://rpc-bradbury.genlayer.com",
   evmRpc: "https://rpc.testnet-chain.genlayer.com",
   chainId: 4221,

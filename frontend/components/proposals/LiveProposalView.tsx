@@ -4,160 +4,33 @@ import { votingState } from "@/lib/voxen/lifecycle";
 import { useVotingClock } from "@/hooks/useVotingClock";
 import { useVoxenEligibility } from "@/hooks/useVoxenEligibility";
 import { useVoxenVote } from "@/hooks/useVoxenVote";
-import {
-  LiveReadError,
-  useVoxenProposal,
-  useVoxenRecordedVote,
-} from "@/hooks/useVoxenProposal";
-import { useWallet } from "@/lib/genlayer/WalletProvider";
+import { LiveReadError, useVoxenProposal } from "@/hooks/useVoxenProposal";
 import { voxenConfig } from "@/lib/voxen/config";
+import { useWallet } from "@/lib/genlayer/WalletProvider";
+import { requestGovernanceReview, transitionProposal } from "@/lib/voxen/writes";
 import { StatusBadge } from "@/components/governance/Badges";
 import { ProposalDetails } from "./ProposalDetails";
-
-export function LiveProposalView({
-  id,
-  compact = false,
-}: {
-  id: string;
-  compact?: boolean;
-}) {
-  const now = useVotingClock();
-  const query = useVoxenProposal(id);
-  const wallet = useWallet();
-  const vote = useVoxenRecordedVote(id, wallet.address);
-  const eligibility = useVoxenEligibility(id);
-  const voting = useVoxenVote(id);
-  const state = query.isFetching
-    ? "Loading"
-    : query.isError
-      ? query.error instanceof LiveReadError &&
-        query.error.state === "unavailable"
-        ? "Unavailable"
-        : "Error"
-      : query.data
-        ? "Live"
-        : "Unavailable";
-  // Never retain stale successful data under a failed or pending refresh.
-  const data = state === "Live" ? query.data : undefined;
-  const p = data?.proposal;
-  const status = (
-    <section className="panel" aria-busy={state === "Loading"}>
-      <div className="row">
-        <h2>Current contract state</h2>
-        <span className="badge" role="status">
-          {state}
-        </span>
-      </div>
-      <p className="small">{id} · Bradbury · Live contract</p>
-      {state === "Loading" && <p>Loading live proposal from Bradbury…</p>}
-      {(state === "Error" || state === "Unavailable") && (
-        <p role="alert">
-          {query.error?.message || "Proposal unavailable."} No sample data is
-          shown.
-        </p>
-      )}
-      {data && p && (
-        <>
-          <p>
-            Voting window:{" "}
-            <strong>
-              {
-                {
-                  BEFORE: "Not started",
-                  WITHIN: "Within scheduled window",
-                  ENDED: "Ended",
-                }[data.timeWindow.window]
-              }
-            </strong>
-            . {data.result === null && "No final result is recorded."}
-          </p>
-          <p className="small muted">
-            Read at {data.fetchedAt}. Latest non-final state; independent reads
-            may span state updates. The voting window is the contract’s
-            execution-time preview.
-          </p>
-          {compact && (
-            <>
-              <h3>
-                <Link href={`/proposals/${id}`}>{p.title} ↗</Link>
-              </h3>
-              <StatusBadge status={votingState(p, now)} />
-              <div className="proof-tally">
-                {p.options.map((o) => (
-                  <div key={o.id}>
-                    <strong>{p.talliesHidden ? "Hidden" : o.votes}</strong>
-                    <span>{o.label}</span>
-                  </div>
-                ))}
-                <div>
-                  <strong>{p.participation}</strong>
-                  <span>Total votes</span>
-                </div>
-              </div>
-              <p>
-                {p.talliesHidden
-                  ? "Results hidden until close."
-                  : "Results visible."}
-              </p>
-            </>
-          )}
-          <p role="status">
-            {!wallet.address
-              ? "Connect a wallet to read its recorded vote."
-              : vote.isFetching
-                ? "Loading wallet vote…"
-                : vote.isError
-                  ? "Error: wallet vote could not be read."
-                  : vote.data?.vote === null
-                    ? "Live: this wallet has no recorded vote."
-                    : vote.data?.vote
-                      ? vote.data.vote.optionIndex === null
-                        ? "Live: vote recorded; choice is hidden."
-                        : `Live: recorded vote — ${p.options[vote.data.vote.optionIndex]?.label ?? "Unavailable option"}.`
-                      : "Wallet vote unavailable."}
-          </p>
-          {vote.isError && (
-            <button className="button" onClick={() => void vote.refetch()}>
-              Retry wallet vote
-            </button>
-          )}
-        </>
-      )}
-      <button
-        className="button"
-        disabled={query.isFetching}
-        onClick={() => {
-          void query.refetch();
-          if (wallet.address) void vote.refetch();
-        }}
-      >
-        Refresh live state
-      </button>
-      <details>
-        <summary>Read source</summary>
-        <p className="mono wrap">{voxenConfig.contract}</p>
-        <p className="mono wrap">{voxenConfig.rpc}</p>
-        <p>External EVM chain: {voxenConfig.chainId}</p>
-        <p className="mono wrap">{voxenConfig.evmRpc}</p>
-      </details>
-    </section>
-  );
+export function LiveProposalView({ id, compact = false }: { id: string; compact?: boolean }) {
+  const now = useVotingClock(); const query = useVoxenProposal(id); const eligibility = useVoxenEligibility(id); const voting = useVoxenVote(id); const wallet = useWallet();
+  const data = query.isSuccess ? query.data : undefined;
+  // Reviews are read from the contract separately from proposal metadata.
+  // Merge that live record for the shared, human-readable detail component.
+  const p = data ? {
+    ...data.proposal,
+    guard: data.review ? {
+      outcome: data.review.classification,
+      risk: data.review.risk,
+      confidence: data.review.confidence,
+      evidenceConsistency: data.review.evidenceConsistent
+        ? "Supporting evidence is consistent."
+        : "Evidence consistency could not be confirmed.",
+      reason: data.review.reason,
+    } : undefined,
+  } : undefined;
+  const review = data?.review;
+  const result = data?.result;
+  const creator = !!p && wallet.address?.toLowerCase() === p.creator.toLowerCase();
+  const status = <section className="panel" aria-busy={query.isFetching}><h2>Current contract state</h2><p className="small">{id} · Bradbury · Live contract</p>{query.isFetching && <p>Loading live proposal from Bradbury…</p>}{query.isError && <p role="alert">{query.error instanceof LiveReadError ? query.error.message : "Live proposal unavailable."}</p>}{p && <><p>Effective status: <strong>{votingState(p, now)}</strong>. {result === null && "No final result is recorded."}</p>{p.guardRequired && <p>Governance Review: {review ? `${review.classification} — ${review.reason}` : "Not requested"}</p>}{creator && p.status === "REVIEW" && <div className="row"><button className="button" onClick={() => void requestGovernanceReview(id, wallet.address!, () => undefined)}>Request Governance Review</button>{review?.classification === "COMPLIANT" && <button className="button primary" onClick={() => void transitionProposal(id, "PUBLISHED", wallet.address!, () => undefined)}>Publish</button>}</div>}{creator && p.status === "PUBLISHED" && now >= Date.parse(p.endsAt) && <button className="button primary" onClick={() => void transitionProposal(id, "FINALIZED", wallet.address!, () => undefined)}>Finalize</button>}{compact && <><h3><Link href={`/proposals/${id}`}>{p.title} ↗</Link></h3><StatusBadge status={votingState(p, now)} /><p>{p.talliesHidden ? "Results hidden until close." : `${p.participation} votes recorded.`}</p></>}</>}<button className="button" disabled={query.isFetching} onClick={() => void query.refetch()}>Refresh live state</button><details><summary>Read source</summary><p className="mono wrap">{voxenConfig.contract}</p></details></section>;
   if (compact) return status;
-  if (p)
-    return (
-      <ProposalDetails
-        p={p}
-        liveState={status}
-        eligibilityCheck={eligibility}
-        voting={voting}
-        recordedVote={vote}
-        timeWindow={data!.timeWindow}
-      />
-    );
-  return (
-    <main id="main" className="shell page">
-      <h1>Proposal {id}</h1>
-      {status}
-    </main>
-  );
+  return p ? <ProposalDetails p={p} liveState={status} eligibilityCheck={eligibility} voting={voting} /> : <main id="main" className="shell page"><h1>Proposal {id}</h1>{status}</main>;
 }

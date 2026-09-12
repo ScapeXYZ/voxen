@@ -1,10 +1,10 @@
 import { createClient } from "genlayer-js";
 import { testnetBradbury } from "genlayer-js/chains";
 import type { TransactionHash } from "genlayer-js/types";
-import { parseAbi, parseEventLogs, type Hex, type Abi } from "viem";
-import { evmClient } from "./eligibility";
+import { createPublicClient, http, parseAbi, parseEventLogs, type Hex, type Abi } from "viem";
 import { voxenConfig } from "./config";
 import { transactionStage, type VoteStage } from "./transaction-state";
+const evmClient = createPublicClient({ transport: http(voxenConfig.evmRpc) });
 const client = createClient({
   chain: {
     ...testnetBradbury,

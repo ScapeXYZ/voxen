@@ -5,10 +5,7 @@ const labels: Record<string, string> = {
   LIVE: "Voting live",
   ENDED: "Voting ended",
   PUBLISHED: "Published",
-  DRAFT: "Awaiting publication",
   REVIEW: "Under review",
-  OPEN: "Voting live",
-  CLOSED: "Voting ended",
   FINALIZED: "Finalized",
   TIED: "Tied",
   ACTIVE: "Active",
@@ -32,14 +29,14 @@ export function EligibilityBadge({
 }) {
   return (
     <span className="meta-tag">
-      {eligibility.mode === "GEN_HOLDING" ? (
+      {eligibility.mode === "GEN" ? (
         <Coins size={13} />
       ) : (
         <Fingerprint size={13} />
       )}{" "}
-      {eligibility.mode === "GEN_HOLDING"
+      {eligibility.mode !== "POAP_NFT"
         ? `${eligibility.minimum} GEN holding`
-        : `${eligibility.label} credential`}
+        : `${eligibility.standard} credential`}
     </span>
   );
 }

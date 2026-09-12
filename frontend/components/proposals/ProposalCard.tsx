@@ -1,7 +1,6 @@
 "use client";
 import { useVotingClock } from "@/hooks/useVotingClock";
 import { votingState, scheduleLabel } from "@/lib/voxen/lifecycle";
-import { sampleSpaces } from "@/lib/voxen/sample-data";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import type { Proposal } from "@/types/voxen";
@@ -21,7 +20,7 @@ export function ProposalCard({ proposal: p }: { proposal: Proposal }) {
       </div>
       <h3>{p.title}</h3>
       <p className="small">
-        {(p.source === "demo" ? sampleSpaces.find((s) => s.id === p.spaceId)?.name : p.communityId) || "Public proposal"}
+        {p.communityId || "Public proposal"}
       </p>
       <p>{p.description}</p>
       <p>{scheduleLabel(p, now)}</p>
@@ -34,7 +33,7 @@ export function ProposalCard({ proposal: p }: { proposal: Proposal }) {
       </div>
       <div className="card-foot">
         <span>{p.participation} participants</span>
-        <span>{p.source === "demo" ? "Sample/demo" : state === "LIVE" ? "View & vote" : "View proposal"}</span>
+        <span>{state === "LIVE" ? "View & vote" : "View proposal"}</span>
       </div>
     </Link>
   );
@@ -44,8 +43,7 @@ export function ProposalNode({ proposal }: { proposal: Proposal }) {
     <Link href={`/proposals/${proposal.id}`} className="proposal-node">
       <div className="row">
         <span className="eyebrow">
-          {sampleSpaces.find((s) => s.id === proposal.spaceId)?.name ||
-            "Public proposal"}
+          {proposal.communityId || "Public proposal"}
         </span>
         <StatusBadge status={proposal.status} />
       </div>

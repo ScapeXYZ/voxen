@@ -6,7 +6,6 @@ import { SupportingReference } from "./SupportingReference";
 import Link from "next/link";
 import type { EligibilityCheck } from "@/hooks/useVoxenEligibility";
 import type { VoteController } from "@/hooks/useVoxenVote";
-import type { useVoxenRecordedVote } from "@/hooks/useVoxenProposal";
 import type { LiveProposal } from "@/lib/voxen/reads";
 import type { ReactNode } from "react";
 import { StatusBadge, EligibilityBadge } from "@/components/governance/Badges";
@@ -28,16 +27,12 @@ export function ProposalDetails({
   liveState,
   eligibilityCheck,
   voting,
-  recordedVote,
-  timeWindow,
 }: {
   p: Proposal;
   space?: Community;
   liveState?: ReactNode;
   eligibilityCheck?: EligibilityCheck;
   voting?: VoteController;
-  recordedVote?: ReturnType<typeof useVoxenRecordedVote>;
-  timeWindow?: LiveProposal["timeWindow"];
 }) {
   const now = useVotingClock();
   const state = votingState(p, now);
@@ -49,7 +44,7 @@ export function ProposalDetails({
       <div className="proposal-heading">
         <div className="card-tags">
           <StatusBadge status={state} />
-          {space && <Link href={`/communities/${space.id}`}>{space.name} ↗</Link>}
+          {space ? <Link href={`/communities/${space.id}`}>{space.name} ↗</Link> : p.communityId ? <Link href={`/communities/${p.communityId}`}>Community {p.communityId} ↗</Link> : null}
         </div>
         <h1>{p.title}</h1>
         <div className="row start">
@@ -60,12 +55,6 @@ export function ProposalDetails({
       <p role="status">{scheduleLabel(p, now)}</p>
       {state === "ENDED" && <p>Voting has ended. Final result has not yet been finalized.</p>}
       {liveState}
-      {p.source === "demo" && (
-        <div className="demo-notice">
-          Sample proposal · All review, participation, and results below are
-          illustrative.
-        </div>
-      )}
       <p className="voting-window">
         Voting opens {date(p.startsAt)} · Voting closes {date(p.endsAt)}
       </p>
@@ -79,8 +68,6 @@ export function ProposalDetails({
           proposal={p}
           voting={voting}
           eligibilityCheck={eligibilityCheck}
-          recordedVote={recordedVote}
-          timeWindow={timeWindow}
         />
       </div>
       <LifecycleTimeline proposal={p} />
@@ -108,8 +95,8 @@ export function ProposalDetails({
                 <dt>Vote change policy</dt>
                 <dd>
                   {p.voteChangePolicy === "FINAL_ON_CAST"
-                    ? "Cannot change after submission"
-                    : "Can change until voting closes"}
+                  ? "Your vote is final once submitted"
+                    : "You can change your vote until voting closes"}
                 </dd>
               </div>
               <div>

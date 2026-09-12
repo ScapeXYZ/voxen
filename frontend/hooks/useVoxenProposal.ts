@@ -1,7 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { LiveProposal, getVote } from "@/lib/voxen/reads";
+import type { LiveProposal } from "@/lib/voxen/reads";
 import { voxenConfig } from "@/lib/voxen/config";
 export class LiveReadError extends Error {
   constructor(
@@ -34,8 +34,8 @@ export function useVoxenProposal(id: string) {
     retry: false,
     staleTime: 0,
   });
-  const start = query.data?.timeWindow.start;
-  const end = query.data?.timeWindow.end;
+  const start = query.data && Date.parse(query.data.proposal.startsAt) / 1000;
+  const end = query.data && Date.parse(query.data.proposal.endsAt) / 1000;
   const { refetch } = query;
   useEffect(() => {
     const timers = [start, end].filter((t): t is number => t !== undefined && t * 1000 > Date.now())
@@ -43,16 +43,4 @@ export function useVoxenProposal(id: string) {
     return () => timers.forEach(clearTimeout);
   }, [start, end, refetch]);
   return query;
-}
-export function useVoxenRecordedVote(id: string, wallet: string | null) {
-  return useQuery({
-    queryKey: ["voxen-vote", ...configKey, id, wallet],
-    queryFn: () =>
-      fetchRead<{ vote: Awaited<ReturnType<typeof getVote>> }>(
-        `/api/voxen/proposals/${encodeURIComponent(id)}?wallet=${encodeURIComponent(wallet!)}`,
-      ),
-    enabled: !!wallet,
-    retry: false,
-    staleTime: 0,
-  });
 }

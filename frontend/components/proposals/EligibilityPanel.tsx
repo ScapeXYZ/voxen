@@ -19,18 +19,17 @@ export function EligibilityPanel({
     <section className="eligibility-panel">
       <Fingerprint size={22} />
       <h3>{e.mode === "POAP_NFT" ? "Required credential" : "Who can vote?"}</h3>
-      {e.mode === "POAP_NFT" && <strong className="wrap">{e.label}</strong>}
       <p>
-        {e.mode === "GEN_HOLDING"
+        {e.mode !== "POAP_NFT"
           ? `To vote, your wallet must hold at least ${e.minimum} GEN.`
           : e.standard === "ERC721"
             ? "To vote, your wallet must hold a credential from this collection."
             : "To vote, your wallet must hold the required credential token."}
       </p>
       <p className="small muted">
-        {e.mode === "GEN_HOLDING"
+        {e.mode !== "POAP_NFT"
           ? "GEN is not spent or locked. It is only used to verify eligibility."
-          : `Required credential: ${e.label}. Your credential stays in your wallet.`}
+          : "Your credential stays in your wallet; ownership is verified by the contract."}
       </p>
       <p className="small">
         These requirements keep voting limited to the community this decision
@@ -48,8 +47,6 @@ export function EligibilityPanel({
                 <dd>{e.tokenId}</dd>
               </>
             )}
-            <dt>Chain ID</dt>
-            <dd>{e.chainId}</dd>
             <dt>Standard</dt>
             <dd>{e.standard}</dd>
           </dl>
@@ -88,9 +85,8 @@ export function EligibilityPanel({
         <details>
           <summary>Verification details</summary>
           <p className="small">
-            Observed balance: {check.data.observedBalance}
-            {e.mode === "GEN_HOLDING" ? " wei" : " tokens"}. Checked{" "}
-            {check.data.checkedAt}.
+            Observed balance: {check.data.observed_balance}
+            {e.mode !== "POAP_NFT" ? " wei" : " tokens"}. Verification: {check.data.verification_status}.
           </p>
         </details>
       )}

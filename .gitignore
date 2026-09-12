@@ -45,6 +45,8 @@ coverage/
 dist/
 build/
 artifacts/
+!artifacts/
+!artifacts/voxen.compact.py
 out/
 cache/
 

@@ -1,7 +1,7 @@
 import type { Proposal } from "@/types/voxen";
 export function votingState(p: Proposal, now = Date.now()) {
   if (p.status === "FINALIZED") return "FINALIZED";
-  if (p.status === "DRAFT" || p.status === "REVIEW") return p.status;
+  if (p.status === "REVIEW") return p.status;
   if (now < Date.parse(p.startsAt)) return "UPCOMING";
   return now < Date.parse(p.endsAt) ? "LIVE" : "ENDED";
 }

@@ -10,11 +10,12 @@ export const emptyProposalForm = {
   end: "",
   policy: "FINAL_ON_CAST",
   visibility: "LIVE",
-  mode: "GEN_HOLDING",
+  mode: "GEN",
   minimum: "",
-  chain: "4221",
   contract: "",
+  // Display-only metadata; never submitted to the reduced contract API.
   label: "",
+  chain: "4221",
   standard: "ERC1155",
   token: "",
   credentialMetadata: "",
@@ -32,7 +33,7 @@ export function validateProposalForm(
     if (!form.title.trim() || !form.description.trim())
       return "Add a title and description.";
     if (live && form.space)
-      return "Sample Communities cannot be published to. Choose Public proposal.";
+      return "This deployment only creates public proposals from this flow.";
   }
   if (
     step === 1 &&
@@ -61,9 +62,9 @@ export function validateProposalForm(
       return "Choose a valid result visibility and vote change policy.";
   }
   if (step === 3) {
-    if (!["GEN_HOLDING", "POAP_NFT"].includes(form.mode))
+    if (!["GEN", "POAP_NFT"].includes(form.mode))
       return "Choose one eligibility mode.";
-    if (form.mode === "GEN_HOLDING") {
+    if (form.mode === "GEN") {
       if (!/^\d+(\.\d{1,18})?$/.test(form.minimum))
         return "Enter a positive minimum GEN balance, up to 18 decimal places.";
       const wei = parseUnits(form.minimum, 18);
@@ -90,11 +91,9 @@ export function validateProposalForm(
       if (
         !isAddress(form.contract) ||
         /^0x0{40}$/i.test(form.contract) ||
-        !form.label.trim() ||
-        form.chain !== "4221" ||
         !["ERC721", "ERC1155"].includes(form.standard)
       )
-        return "Check the credential contract and token settings. Use Bradbury chain ID 4221.";
+        return "Check the credential contract and token settings.";
       if (form.standard === "ERC721" && form.token)
         return "ERC721 collection eligibility does not accept a token ID.";
       if (
@@ -127,7 +126,7 @@ export function createProposalArgs(
     const error = validateProposalForm(form, options, step, true);
     if (error) throw new Error(error);
   }
-  const gen = form.mode === "GEN_HOLDING";
+  const gen = form.mode === "GEN";
   return [
     form.title,
     form.description,
@@ -142,9 +141,7 @@ export function createProposalArgs(
     form.policy,
     gen ? parseUnits(form.minimum, 18) : null,
     gen ? null : form.contract,
-    gen ? null : form.label,
     gen ? null : form.standard,
-    gen ? null : Number(form.chain),
     !gen && form.standard === "ERC1155" ? BigInt(form.token) : null,
   ];
 }

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getProposalEligibility } from "@/lib/voxen/reads";
-import { verifyEligibility } from "@/lib/voxen/eligibility";
+import { checkEligibility } from "@/lib/voxen/reads";
 export const dynamic = "force-dynamic";
 export async function GET(
   request: NextRequest,
@@ -17,7 +16,7 @@ export async function GET(
     return respond({ message: "Invalid proposal or wallet." }, 400);
   try {
     return respond(
-      await verifyEligibility(wallet, await getProposalEligibility(id)),
+      await checkEligibility(id, wallet),
     );
   } catch (error) {
     return respond(

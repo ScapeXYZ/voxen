@@ -31,6 +31,19 @@
   --primary: #282d2c;
   --ring: #526e8c;
 }
+[data-theme="dark"] {
+  --paper: #181b1a;
+  --ink: #f1f0e9;
+  --muted: #b8bbb2;
+  --line: #3b403d;
+  --blue: #9db6d0;
+  --green: #a5c1a6;
+  --background: #181b1a;
+  --foreground: #f1f0e9;
+  --card: #222624;
+  --border: #3b403d;
+  --primary: #f1f0e9;
+}
 * {
   box-sizing: border-box;
 }
@@ -858,7 +871,6 @@ dd {
   background: currentColor;
   border-radius: 50%;
 }
-.status-open,
 .status-active,
 .status-compliant {
   color: #496442;

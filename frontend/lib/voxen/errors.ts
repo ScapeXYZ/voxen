@@ -23,8 +23,8 @@ export function voteError(error: unknown) {
   }
   const messages: [RegExp, string][] = [
     [
-      /Proposal is not OPEN|Proposal is not published|not currently open/i,
-      "This proposal is not currently open for voting.",
+      /Proposal is not published|not currently available for voting/i,
+      "This proposal is not currently available for voting.",
     ],
     [
       /Outside voting window|Voting is not active/i,

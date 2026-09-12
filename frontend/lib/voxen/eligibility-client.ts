@@ -7,7 +7,7 @@ export async function fetchEligibility(id: string, wallet: string) {
   if (!response.ok) throw new Error(body.technical || body.message);
   return body as {
     eligible: boolean;
-    observedBalance: string;
-    checkedAt: string;
+    observed_balance: string;
+    verification_status: string;
   };
 }

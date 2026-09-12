@@ -17,16 +17,17 @@ Configure the four public variables documented in `.env.example`. `lib/voxen/con
 ## Data and integration
 
 - `types/voxen.ts`: governance types, including discriminated eligibility requirements.
-- `lib/voxen/sample-data.ts`: explicitly illustrative Spaces, proposals, reviews, and participation.
-- `lib/voxen/data.ts`: replaceable data-source interface and fail-closed integration boundaries. No backend APIs are fabricated.
-- `lib/voxen/proof.ts`: project-supplied historical Bradbury proof, separated from demo data and configurable deployment settings. It is not an independently verified RPC feed.
-- Creation forms save drafts to this browser’s local storage; no contract write is made. Drafts can be inspected under `voxen:proposal-draft` and `voxen:space-draft` in browser storage. Times entered in local time are shown as UTC at proposal review.
+- `lib/voxen/reads.ts`: live proposal discovery and contract-state reads.
+- `lib/voxen/writes.ts`: wallet-backed proposal, review, transition, and vote submissions.
+- `lib/voxen/config.ts`: the pinned Bradbury deployment and RPC configuration.
 
-Pending integration: implement deployed contract reads and writes using genlayer-js; verify GEN/ERC721/ERC1155 eligibility; load validator reviews, lifecycle, and authorized results; submit votes with policy enforcement; create Spaces/proposals; accept prepared Space ownership from the intended wallet. Contract submission and voting remain disabled. Do not enable writes until the deployed interface and transaction receipt handling are verified. Space proposal permissions and Guard BLOCK/WARN policies must be enforced by the contract, not just the UI.
+The UI uses live contract data only. It does not create local proposal drafts,
+sample proposals, fake transaction hashes, or fake validator activity. Times
+entered in the creation flow are converted to contract timestamps on submission.
 
 ## Routes
 
-`/`, `/explore`, `/spaces`, `/spaces/[id]`, `/proposals/[id]`, `/create`, `/create-space`, `/live-proof`.
+`/`, `/explore`, `/communities`, `/proposals/[id]`, `/create`, `/live-proof`.
 
 ## Validation
 
