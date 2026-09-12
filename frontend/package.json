@@ -1,11 +1,11 @@
 {
   "name": "voxen",
   "version": "1.0.0",
-  "description": "Voxen \u2014 eligibility-gated governance on GenLayer",
+  "description": "Voxen — eligibility-gated governance on GenLayer",
   "main": "index.js",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "tsc --noEmit"
   },
