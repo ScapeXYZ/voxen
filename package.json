@@ -11,6 +11,7 @@
     "deploy": "genlayer deploy"
   },
   "devDependencies": {
-    "genlayer-js": "^1.1.8"
+    "genlayer": "0.39.2",
+    "genlayer-js": "1.1.8"
   }
 }

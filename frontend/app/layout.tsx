@@ -1,32 +1,38 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
-
+import { Navbar } from "@/components/layout/Navbar";
+import { Footer } from "@/components/layout/Footer";
+import Script from "next/script";
 export const metadata: Metadata = {
-  title: "GenLayer Football Market",
-  description: "AI-powered football match predictions on GenLayer blockchain. Create bets, make predictions, and compete for points.",
-  manifest: "/site.webmanifest",
-  icons: {
-    icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-    ],
+  title: {
+    default: "Voxen — Decisions, governed by consensus.",
+    template: "%s | Voxen",
   },
+  description:
+    "Eligibility-gated governance and rule-aware decisions, built on GenLayer.",
+  icons: { icon: "/favicon.svg" },
+  manifest: "/site.webmanifest",
 };
-
-export const viewport: Viewport = {
-  themeColor: "#9B6AF6", // GenLayer brand purple
-};
-
+export const viewport: Viewport = { themeColor: "#f6f5f0" };
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <Script id="theme-preference" strategy="beforeInteractive">{`try { const saved = localStorage.getItem('voxen-theme'); const dark = saved ? saved === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; document.documentElement.dataset.theme = dark ? 'dark' : 'light'; } catch {}`}</Script>
+      </head>
       <body>
         <Providers>
+          <a className="skip-link" href="#main">
+            Skip to content
+          </a>
+          <Navbar />
           {children}
+          <Footer />
         </Providers>
       </body>
     </html>

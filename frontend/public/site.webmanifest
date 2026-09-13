@@ -1,16 +1,1 @@
-{
-  "name": "GenLayer Football Market",
-  "short_name": "GenLayer Market",
-  "description": "AI-powered football match predictions on GenLayer blockchain",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#9B6AF6",
-  "icons": [
-    {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml"
-    }
-  ]
-}
+{"name":"Voxen","short_name":"Voxen","description":"Decisions, governed by consensus.","start_url":"/","display":"standalone","background_color":"#f6f5f0","theme_color":"#f6f5f0","icons":[{"src":"/favicon.svg","sizes":"any","type":"image/svg+xml"}]}
