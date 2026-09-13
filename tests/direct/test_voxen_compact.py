@@ -3,6 +3,7 @@ import ast
 import importlib.util
 from pathlib import Path
 import subprocess
+import pytest
 from gltest.direct import create_address
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,6 +50,20 @@ def test_compact_artifact_has_required_directive_and_valid_python():
     artifact = ARTIFACT.read_text()
     assert artifact.splitlines()[0] == SOURCE.read_text().splitlines()[0]
     compile(artifact, str(ARTIFACT), "exec")
+
+
+def test_compact_gen_balance_uses_the_native_eth_contract_proxy():
+    build()
+    artifact = ARTIFACT.read_text()
+    assert "_genlayer_wasi" not in artifact
+    assert "wasi.get_balance" not in artifact
+    assert "EthContract" in artifact
+    tree = ast.parse(artifact)
+    native_balance = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                          and any(isinstance(child, ast.Attribute) and child.attr == "balance"
+                                  for child in ast.walk(node)))
+    assert any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+               and node.func.id == "EthContract" for node in ast.walk(native_balance))
 
 
 def test_compact_artifact_preserves_the_public_contract_surface():
@@ -130,3 +145,60 @@ def test_compact_public_lifecycle_matches_canonical_behavior(direct_vm, direct_d
     assert contract.get_space(space_id)["id"] == space_id
     assert contract.get_proposal(proposal_id)["status"] == "PUBLISHED"
     assert contract.get_proposal_ids() == {"ids": [proposal_id], "total": 1, "next_offset": None}
+
+
+def test_compact_gen_eligibility_does_not_shadow_native_balance_helper(direct_vm, direct_deploy, monkeypatch):
+    """Exercise generated code: this used to emit `a = a(Address(...))`."""
+    wallet = create_address("compact-gen-eligible")
+    balances = {wallet: 5}
+    monkeypatch.setattr("_genlayer_wasi.get_balance", lambda raw: balances.get(raw, 0))
+    direct_vm.sender = wallet
+    direct_vm.warp("1970-01-01T00:00:01Z")
+    compact = direct_deploy(str(ARTIFACT))
+    proposal_id = compact.create_proposal(
+        "GEN threshold", "Generated compact artifact", ["A", "B"], 1, 2,
+        "GEN", vote_change_policy="CHANGE_UNTIL_CLOSE", minimum_gen_balance=5)
+
+    assert compact.check_eligibility(proposal_id, "0x" + wallet.hex())["eligible"] is True
+    compact.cast_vote(proposal_id, 0)
+    balances[wallet] = 4
+    assert compact.check_eligibility(proposal_id, "0x" + wallet.hex())["eligible"] is False
+    from genlayer import gl
+    with pytest.raises((ValueError, gl.vm.UserError)):
+        compact.cast_vote(proposal_id, 1)
+    assert compact.get_proposal_tallies(proposal_id)["counts"] == [1, 0]
+
+
+def test_compact_erc721_and_erc1155_eligibility_remain_verified(direct_vm, direct_deploy, monkeypatch):
+    build()
+    wallet = create_address("compact-credential-holder")
+    direct_vm.sender = wallet
+    compact = direct_deploy(str(ARTIFACT))
+    import genlayer.gl._internal.gl_call as calls
+    from genlayer.py.types import Lazy
+    monkeypatch.setattr(calls, "gl_call_generic",
+                        lambda _, decode: Lazy(lambda: decode((1).to_bytes(32, "big"))))
+    collection = "0x0000000000000000000000000000000000000001"
+    for kind, token in (("ERC721", None), ("ERC1155", 7)):
+        proposal_id = compact.create_proposal(
+            kind, "Generated compact artifact", ["A", "B"], 1, 2, "POAP_NFT",
+            minimum_gen_balance=None, credential_contract_address=collection,
+            credential_type=kind, credential_token_id=token)
+        assert compact.check_eligibility(proposal_id, "0x" + wallet.hex())["eligible"] is True
+
+
+def test_compact_artifact_has_no_self_shadowing_call_from_renaming():
+    build()
+    tree = ast.parse(ARTIFACT.read_text())
+    broken = []
+    for function in ast.walk(tree):
+        if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        for node in ast.walk(function):
+            if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                    and isinstance(node.targets[0], ast.Name)
+                    and isinstance(node.value, ast.Call)
+                    and isinstance(node.value.func, ast.Name)
+                    and node.targets[0].id == node.value.func.id):
+                broken.append((function.name, node.targets[0].id))
+    assert broken == []

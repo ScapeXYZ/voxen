@@ -9,6 +9,7 @@ import argparse
 import ast
 import io
 import itertools
+import keyword
 import string
 import tokenize
 from pathlib import Path
@@ -102,6 +103,29 @@ def _replacement_plan(tree):
             private[node.target.id] = next(names)
         elif isinstance(node, ast.FunctionDef) and node.name.startswith("_") and node.name != "__init__":
             private[node.name] = next(names)
+
+    # Function-local bindings shadow every module-level binding, including
+    # compacted private helpers.  Reserve those names before allocating locals:
+    # otherwise `_helper -> a` and `local = _helper(...) -> a = a(...)` makes
+    # the call resolve to the uninitialized local at runtime.  Imports are
+    # included explicitly because proxy/interface constructors such as Address
+    # may come from wildcard imports and must never be captured by a local.
+    # EthContract is a module-level interface declared by Voxen and is likewise
+    # reserved: the native GEN check must continue to call that proxy.
+    reserved_local_names = set(private.values())
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            reserved_local_names.add(node.name)
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = node.targets if isinstance(node, ast.Assign) else (node.target,)
+            reserved_local_names.update(target.id for target in targets if isinstance(target, ast.Name))
+        elif isinstance(node, ast.Import):
+            reserved_local_names.update(alias.asname or alias.name.split(".")[0]
+                                        for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            reserved_local_names.update(alias.asname or alias.name for alias in node.names
+                                        if alias.name != "*")
+    reserved_local_names.add("EthContract")
     local = {}
     for function in ast.walk(tree):
         if not isinstance(function, ast.FunctionDef) or _has_nested_scope(function):
@@ -115,7 +139,8 @@ def _replacement_plan(tree):
         own = [function, *_walk_own(function)]
         bindings.extend(node for node in own if isinstance(node, ast.Name)
                         and isinstance(node.ctx, (ast.Store, ast.Del)))
-        mapping, shorts = {}, _short_names()
+        mapping, shorts = {}, (name for name in _short_names()
+                               if name not in reserved_local_names and not keyword.iskeyword(name))
         for binding in bindings:
             name = binding.arg if isinstance(binding, ast.arg) else binding.id
             if name != "self" and name not in public_args and name not in mapping:

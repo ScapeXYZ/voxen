@@ -1,5 +1,7 @@
 """Core Voxen contract regressions for the compact, time-driven ABI."""
+import ast
 import datetime
+from pathlib import Path
 import pytest
 from gltest.direct import create_address
 
@@ -70,6 +72,17 @@ def test_gen_eligibility_is_checked_at_cast_and_final_vote_is_one_per_wallet(vox
     with pytest.raises(ContractErrors):
         voxen.cast_vote(pid, 1)
     assert voxen.get_proposal_tallies(pid) == {"hidden": False, "counts": [1, 0], "total_votes": 1}
+
+
+def test_cast_uses_undecorated_eligibility_helper_in_its_write_path():
+    """GenVM writes must not invoke the decorated public view dispatcher."""
+    tree = ast.parse(Path("contracts/voxen.py").read_text())
+    cast = next(node for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef) and node.name == "cast_vote")
+    calls = [node.func.attr for node in ast.walk(cast)
+             if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)]
+    assert "_check_eligibility_internal" in calls
+    assert "check_eligibility" not in calls
 
 
 def test_change_until_close_rechecks_eligibility(voxen, monkeypatch):

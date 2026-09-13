@@ -17,17 +17,27 @@ from genlayer.gl.nondet import NondetException
 from genlayer import *
 from genlayer.py.evm.calldata import MethodEncoder
 import genlayer.gl._internal.gl_call as gl_call
-import _genlayer_wasi as wasi
 
 
 # Deployment trust boundary: Bradbury EVM, NOT gl.message.chain_id (reports 1).
 TRUSTED_EVM_CHAIN_ID = 4221
 
 
+@gl.evm.contract_interface
+class EthContract:
+    """SDK-native balance proxy; valid for an address, not only a contract."""
+    class View:
+        pass
+
+    class Write:
+        pass
+
+
 def _native_balance(owner):
-    # Same WASI get_balance used by the probe's SDK .balance proxy. Validate
-    # before SDK u256/int coercion so bool/string/overflow cannot become balances.
-    observed = wasi.get_balance(owner.as_bytes)
+    # Use the pinned SDK's address-balance proxy rather than its private WASI
+    # module.  genlayer-py-std implements this property with the runtime's
+    # native balance primitive.
+    observed = int(EthContract(owner).balance)
     if type(observed) is not int or not 0 <= observed < 2**256:
         raise gl.vm.UserError("Native balance verification unavailable")
     return observed
@@ -353,15 +363,14 @@ class Voxen(gl.Contract):
                 "verification_status": "VERIFIED",
                 "network_verification_status": "UNPROVEN_RUNTIME_CHAIN_ID"}
 
-    @gl.public.view
-    def check_eligibility(self, proposal_id: str, wallet: str) -> dict:
-        """Eligibility preview only, not proof of wallet control or permission to vote.
+    def _check_eligibility_internal(self, proposal_id, wallet):
+        """Authoritative eligibility verification shared by views and writes.
 
-        Casting uses message.sender_address and requires eligible is True,
-        and enforces lifecycle/time independently. Never accept this preview
-        from a client as authorization. Errors propagate and reject the operation.
+        This deliberately remains undecorated. Calling a public view entrypoint
+        from a public write can route through the GenVM dispatcher rather than
+        ordinary contract code, while a cast must recheck eligibility on-chain.
         """
-        config = self.get_proposal_eligibility(proposal_id)
+        config = self._proposal(proposal_id)["eligibility"]
         normalized = self._evm_address(wallet)
         result = dict(config)
         result["wallet"] = normalized
@@ -372,6 +381,11 @@ class Voxen(gl.Contract):
         else:
             raise gl.vm.UserError("Unsupported eligibility mode")
         return result
+
+    @gl.public.view
+    def check_eligibility(self, proposal_id: str, wallet: str) -> dict:
+        """Preview only; casts recheck the transaction sender on-chain."""
+        return self._check_eligibility_internal(proposal_id, wallet)
 
     def _transaction_time(self):
         """Integer Unix seconds from transaction context, never host datetime.now().
@@ -417,7 +431,7 @@ class Voxen(gl.Contract):
         if type(option_index) is not int or not 0 <= option_index < len(proposal["options"]):
             raise gl.vm.UserError("Invalid option index")
         voter = self._evm_address(self._sender())
-        verification = self.check_eligibility(proposal_id, voter)
+        verification = self._check_eligibility_internal(proposal_id, voter)
         if verification["eligible"] is not True:
             raise gl.vm.UserError("Eligibility not verified")
         key = self._vote_key(proposal_id, voter)
