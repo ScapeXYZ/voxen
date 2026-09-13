@@ -33,7 +33,7 @@ export function ProposalCard({ proposal: p }: { proposal: Proposal }) {
       </div>
       <div className="card-foot">
         <span>{p.participation} participants</span>
-        <span>{state === "LIVE" ? "View & vote" : "View proposal"}</span>
+        <span>{state === "LIVE" ? "View & vote" : "View details"}</span>
       </div>
     </Link>
   );
