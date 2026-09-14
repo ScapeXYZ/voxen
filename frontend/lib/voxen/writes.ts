@@ -2,7 +2,7 @@
 import { createClient } from "genlayer-js";
 import type { CalldataEncodable } from "genlayer-js/types";
 import { createProposalArgs, type ProposalForm } from "./create-proposal";
-import { testnetBradbury } from "genlayer-js/chains";
+import { studionet } from "genlayer-js/chains";
 import { getEthereumProvider } from "@/lib/genlayer/client";
 import { voxenConfig } from "./config";
 import type { LiveProposal } from "./reads";
@@ -78,7 +78,7 @@ async function submitContractWrite(
     if (accounts[0]?.toLowerCase() !== wallet.toLowerCase())
       throw new Error("Connected wallet changed");
     const chain = await provider.request({ method: "eth_chainId" });
-    if (Number(chain) !== voxenConfig.chainId || voxenConfig.chainId !== 4221)
+    if (Number(chain) !== voxenConfig.chainId)
       throw new Error("Unsupported network");
   };
   await assertWallet();
@@ -86,7 +86,7 @@ async function submitContractWrite(
   const client = createClient({
     account: wallet as `0x${string}`,
     chain: {
-      ...testnetBradbury,
+      ...studionet,
       rpcUrls: { default: { http: [voxenConfig.rpc] } },
     },
     provider: {
