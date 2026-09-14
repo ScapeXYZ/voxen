@@ -1,0 +1,62 @@
+diff --git a/node_modules/genlayer-js/dist/index.cjs b/node_modules/genlayer-js/dist/index.cjs
+index 5a5d0ee..0000000 100644
+--- a/node_modules/genlayer-js/dist/index.cjs
++++ b/node_modules/genlayer-js/dist/index.cjs
+@@ -996,11 +996,7 @@
+   const nonce = await client.getCurrentNonce({ address: validatedAccount.address });
+   let estimatedGas;
+   try {
+-    estimatedGas = await client.estimateTransactionGas({
+-      to: client.chain.consensusMainContract.address,
+-      data: encodedData,
+-      value
+-    });
++    estimatedGas = 500_000n;
+   } catch (err) {
+     console.error("Gas estimation failed, using default 200_000:", err);
+     estimatedGas = 200000n;
+@@ -1103,12 +1099,7 @@
+   const sendWithEncodedData = async (encodedDataForSend) => {
+     let estimatedGas;
+     try {
+-      estimatedGas = await client.estimateTransactionGas({
+-        from: validatedSenderAccount.address,
+-        to: _optionalChain([client, 'access', _60 => _60.chain, 'access', _61 => _61.consensusMainContract, 'optionalAccess', _62 => _62.address]),
+-        data: encodedDataForSend,
+-        value
+-      });
++      estimatedGas = 500_000n;
+     } catch (err) {
+       console.error("Gas estimation failed, using default 200_000:", err);
+       estimatedGas = 200000n;
+diff --git a/node_modules/genlayer-js/dist/index.js b/node_modules/genlayer-js/dist/index.js
+index 5a5d0ee..0000000 100644
+--- a/node_modules/genlayer-js/dist/index.js
++++ b/node_modules/genlayer-js/dist/index.js
+@@ -996,11 +996,7 @@
+   const nonce = await client.getCurrentNonce({ address: validatedAccount.address });
+   let estimatedGas;
+   try {
+-    estimatedGas = await client.estimateTransactionGas({
+-      to: client.chain.consensusMainContract.address,
+-      data: encodedData,
+-      value
+-    });
++    estimatedGas = 500_000n;
+   } catch (err) {
+     console.error("Gas estimation failed, using default 200_000:", err);
+     estimatedGas = 200000n;
+@@ -1103,12 +1099,7 @@
+   const sendWithEncodedData = async (encodedDataForSend) => {
+     let estimatedGas;
+     try {
+-      estimatedGas = await client.estimateTransactionGas({
+-        from: validatedSenderAccount.address,
+-        to: client.chain.consensusMainContract?.address,
+-        data: encodedDataForSend,
+-        value
+-      });
++      estimatedGas = 500_000n;
+     } catch (err) {
+       console.error("Gas estimation failed, using default 200_000:", err);
+       estimatedGas = 200000n;

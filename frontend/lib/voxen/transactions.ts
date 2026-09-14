@@ -1,5 +1,5 @@
 import { createClient } from "genlayer-js";
-import { testnetBradbury } from "genlayer-js/chains";
+import { studionet } from "genlayer-js/chains";
 import type { TransactionHash } from "genlayer-js/types";
 import { createPublicClient, http, parseAbi, parseEventLogs, type Hex, type Abi } from "viem";
 import { voxenConfig } from "./config";
@@ -7,7 +7,7 @@ import { transactionStage, type VoteStage } from "./transaction-state";
 const evmClient = createPublicClient({ transport: http(voxenConfig.evmRpc) });
 const client = createClient({
   chain: {
-    ...testnetBradbury,
+    ...studionet,
     rpcUrls: { default: { http: [voxenConfig.rpc] } },
   },
 });
@@ -31,8 +31,8 @@ export async function readVoteTransaction(hash: Hex, kind: "evm" | "genlayer") {
         technical:
           "The EVM transaction reverted before entering GenLayer consensus.",
       };
-    const consensus = testnetBradbury.consensusMainContract;
-    if (!consensus) throw new Error("Missing Bradbury consensus configuration");
+    const consensus = studionet.consensusMainContract;
+    if (!consensus) throw new Error("Missing Studio consensus configuration");
     const logs = receipt.logs.filter(
       (log) => log.address.toLowerCase() === consensus.address.toLowerCase(),
     );

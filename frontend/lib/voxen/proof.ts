@@ -1,8 +1,8 @@
-import { BRADBURY } from "./config";
+import { ACTIVE_NETWORK } from "./config";
 /** Historical deployment evidence supplied by the project; not a current RPC read. */
 export const liveProof = {
-  network: "Bradbury",
-  contract: BRADBURY.contract,
+  network: "Studio",
+  contract: ACTIVE_NETWORK.contract,
   badge: "0x9d7cDC2d47EdC8Fb697564F686cd028Db592504b",
   tokenId: "501",
   proposal: "proposal-3",

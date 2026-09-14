@@ -8,10 +8,12 @@
     "build": "cd frontend && npm run build",
     "start": "cd frontend && npm run start",
     "lint": "cd frontend && npm run lint",
-    "deploy": "genlayer deploy"
+    "deploy": "genlayer deploy",
+    "postinstall": "patch-package"
   },
   "devDependencies": {
     "genlayer": "0.39.2",
-    "genlayer-js": "1.1.8"
+    "genlayer-js": "1.1.8",
+    "patch-package": "^8.0.1"
   }
 }

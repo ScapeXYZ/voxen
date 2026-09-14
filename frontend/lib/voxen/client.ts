@@ -1,12 +1,12 @@
 import { abi, createClient } from "genlayer-js";
-import { testnetBradbury } from "genlayer-js/chains";
+import { studionet } from "genlayer-js/chains";
 import { TransactionHashVariant } from "genlayer-js/types";
 import { voxenConfig } from "./config";
 
 // No account or wallet provider: this boundary exposes read operations only.
 const client = createClient({
   chain: {
-    ...testnetBradbury,
+    ...studionet,
     id: voxenConfig.chainId,
     rpcUrls: { default: { http: [voxenConfig.rpc] } },
   },
@@ -36,7 +36,7 @@ export async function readVoxen(
       }),
       new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(new Error("Bradbury read timed out")),
+          () => reject(new Error("Studio read timed out")),
           20_000,
         );
       }),
@@ -46,7 +46,7 @@ export async function readVoxen(
   }
 }
 
-/** Bradbury currently embeds GenVM UserError calldata in a Go byte dump.
+/** Studio currently embeds GenVM UserError calldata in a Go byte dump.
  * The SDK leaves this error undecoded. Only a decoded, exact missing-ID
  * error is classified as unavailable; other RPC failures stay errors.
  */

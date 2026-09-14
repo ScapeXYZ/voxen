@@ -1,16 +1,16 @@
-/** Explicit application trust configuration; wallet chain ID alone does not identify Bradbury. */
-export const BRADBURY = {
-  contract: "0x7E9A12C4e2a53A760065E98BeF726741334A4D89",
-  rpc: "https://rpc-bradbury.genlayer.com",
+/** Explicit application trust configuration for the active GenLayer network. */
+export const ACTIVE_NETWORK = {
+  contract: "0x08543c5E39EdA94E13Fb18A77bf865184c3BE691",
+  rpc: "https://studio.genlayer.com/api",
   evmRpc: "https://rpc.testnet-chain.genlayer.com",
-  chainId: 4221,
+  chainId: 61999,
 } as const;
 export const voxenConfig = {
-  contract: process.env.NEXT_PUBLIC_VOXEN_CONTRACT || BRADBURY.contract,
-  rpc: process.env.NEXT_PUBLIC_GENLAYER_RPC || BRADBURY.rpc,
-  evmRpc: process.env.NEXT_PUBLIC_GENLAYER_EVM_RPC || BRADBURY.evmRpc,
+  contract: process.env.NEXT_PUBLIC_VOXEN_CONTRACT || ACTIVE_NETWORK.contract,
+  rpc: process.env.NEXT_PUBLIC_GENLAYER_RPC || ACTIVE_NETWORK.rpc,
+  evmRpc: process.env.NEXT_PUBLIC_GENLAYER_EVM_RPC || ACTIVE_NETWORK.evmRpc,
   chainId: Number(
-    process.env.NEXT_PUBLIC_GENLAYER_CHAIN_ID || BRADBURY.chainId,
+    process.env.NEXT_PUBLIC_GENLAYER_CHAIN_ID || ACTIVE_NETWORK.chainId,
   ),
 };
 if (
