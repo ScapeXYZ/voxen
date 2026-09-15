@@ -18,17 +18,15 @@ export const voteStageLabels: Record<VoteStage, string> = {
   finalized: "Finalized",
   failed: "Failed",
 };
-/** Never infer execution success from consensus status alone. SDK 1.1.8: 5 Accepted, 7 Finalized. */
+/** Never infer execution success from consensus status alone. SDK 2.0.0-rc.1: 5 Accepted, 7 Finalized. */
 export function transactionStage(tx: GenLayerTransaction): VoteStage {
   const status =
     typeof tx.status === "number" ? tx.status : tx.statusName || tx.status;
   const decided = [
     5,
     7,
-    11,
     "ACCEPTED",
     "FINALIZED",
-    "READY_TO_FINALIZE",
   ].includes(status ?? "");
   if (
     status === 8 ||
@@ -45,9 +43,7 @@ export function transactionStage(tx: GenLayerTransaction): VoteStage {
   if (
     success &&
     (status === 5 ||
-      status === "ACCEPTED" ||
-      status === 11 ||
-      status === "READY_TO_FINALIZE")
+      status === "ACCEPTED")
   )
     return "accepted";
   return "processing";

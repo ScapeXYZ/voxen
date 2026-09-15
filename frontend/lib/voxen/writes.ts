@@ -2,7 +2,7 @@
 import { createClient } from "genlayer-js";
 import type { CalldataEncodable } from "genlayer-js/types";
 import { createProposalArgs, type ProposalForm } from "./create-proposal";
-import { studionet } from "genlayer-js/chains";
+import { studioDevnet } from "genlayer-js/chains";
 import { getEthereumProvider } from "@/lib/genlayer/client";
 import { voxenConfig } from "./config";
 import type { LiveProposal } from "./reads";
@@ -84,9 +84,12 @@ async function submitContractWrite(
   await assertWallet();
   let sent = false;
   const client = createClient({
-    account: wallet as `0x${string}`,
+    account: {
+      address: wallet as `0x${string}`,
+      type: "json-rpc",
+    },
     chain: {
-      ...studionet,
+      ...studioDevnet,
       rpcUrls: { default: { http: [voxenConfig.rpc] } },
     },
     provider: {
@@ -118,11 +121,23 @@ async function submitContractWrite(
   });
   // No approval, transfer, label, or eligibility verdict is passed to the contract.
   // The contract checks the actual sender, current time, and current holding.
-  const txId = await client.writeContract({
+  const write = {
     address: voxenConfig.contract as `0x${string}`,
     functionName,
     args,
     value: 0n,
+  };
+  const fees = await client.estimateTransactionFeesForWrite({
+    account: { address: wallet as `0x${string}`, type: "json-rpc" },
+    ...write,
+  });
+  const txId = await client.writeContract({
+    ...write,
+    fees: {
+      distribution: fees.distribution,
+      messageAllocations: fees.messageAllocations,
+      feeValue: fees.feeValue,
+    },
   });
   if (typeof txId !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(txId))
     throw new Error("SDK returned an invalid transaction ID");

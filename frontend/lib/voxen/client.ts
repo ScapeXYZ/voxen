@@ -1,12 +1,12 @@
 import { abi, createClient } from "genlayer-js";
-import { studionet } from "genlayer-js/chains";
+import { studioDevnet } from "genlayer-js/chains";
 import { TransactionHashVariant } from "genlayer-js/types";
 import { voxenConfig } from "./config";
 
 // No account or wallet provider: this boundary exposes read operations only.
 const client = createClient({
   chain: {
-    ...studionet,
+    ...studioDevnet,
     id: voxenConfig.chainId,
     rpcUrls: { default: { http: [voxenConfig.rpc] } },
   },
