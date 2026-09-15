@@ -1,7 +1,7 @@
 /** Explicit application trust configuration for the active GenLayer network. */
 export const ACTIVE_NETWORK = {
   name: "Studio Devnet",
-  contract: "0x07b84a6973C13844762C65cC69151DCa58ff2f50",
+  contract: "0x5e4B903738C01bb0cf236954d6aEA0046cCeA3d4",
   rpc: "https://studio-dev.genlayer.com/api",
   evmRpc: "https://rpc.testnet-chain.genlayer.com",
   chainId: 61997,
