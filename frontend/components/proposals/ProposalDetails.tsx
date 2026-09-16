@@ -74,18 +74,18 @@ export function ProposalDetails({
           {p.evidenceUrl && <SupportingReference url={p.evidenceUrl} />}
         </section>
         <div className="proposal-context-grid">
-          <section className="panel">
+          <section className="panel voting-rules-panel">
             <h2>Voting rules</h2>
-            <dl className="metadata-grid">
-              <div><dt>Eligibility</dt><dd><EligibilityBadge eligibility={p.eligibility} /></dd></div>
-              <div><dt>Vote policy</dt><dd>{p.voteChangePolicy === "FINAL_ON_CAST" ? "One final vote per wallet" : "Changes allowed until close"}</dd></div>
-              <div><dt>Results</dt><dd>{p.resultVisibility === "LIVE" ? "Visible while voting is open" : "Hidden until voting closes"}</dd></div>
+            <dl className="voting-rules-list">
+              <div className="voting-rule-row"><dt>Eligibility</dt><dd><EligibilityBadge eligibility={p.eligibility} /></dd></div>
+              <div className="voting-rule-row"><dt>Vote policy</dt><dd>{p.voteChangePolicy === "FINAL_ON_CAST" ? "One final vote per wallet" : "Changes allowed until close"}</dd></div>
+              <div className="voting-rule-row"><dt>Results</dt><dd>{p.resultVisibility === "LIVE" ? "Visible while voting is open" : "Hidden until voting closes"}</dd></div>
             </dl>
           </section>
           <GovernanceReview p={p} space={space} />
         </div>
         <details className="technical-details"><summary>Technical proposal parameters</summary>
-          <dl className="metadata-grid"><div><dt>Starts</dt><dd>{date(p.startsAt)}</dd></div><div><dt>Ends</dt><dd>{date(p.endsAt)}</dd></div><div><dt>Proposal ID</dt><dd><code>{p.id}</code></dd></div></dl>
+          <dl className="technical-parameters-grid"><div className="technical-parameter"><dt>Starts</dt><dd>{date(p.startsAt)}</dd></div><div className="technical-parameter"><dt>Ends</dt><dd>{date(p.endsAt)}</dd></div><div className="technical-parameter"><dt>Proposal ID</dt><dd><code>{p.id}</code></dd></div></dl>
           {p.eligibility.mode === "POAP_NFT" && <dl className="metadata-grid"><div><dt>Credential contract</dt><dd><AddressDisplay address={p.eligibility.contract} /></dd></div><div><dt>Chain / token ID</dt><dd><code>{p.eligibility.chainId} / {p.eligibility.tokenId || "Not specified"}</code></dd></div></dl>}
         </details>
       </section>
