@@ -13,11 +13,12 @@ import { voteStageLabels } from "@/lib/voxen/transaction-state";
 import { SupportingReference } from "./SupportingReference";
 import { CredentialPicker } from "./CredentialPicker";
 import { voxenConfig } from "@/lib/voxen/config";
-const steps = ["Proposal details", "Voting choices", "Voting period", "Who can vote?", "Review & publish"];
+import { ConsensusTrace } from "./ConsensusTrace";
+const steps = [["Proposal details", "Frame the decision"], ["Voting choices", "Set the available options"], ["Voting period", "Schedule participation"], ["Eligibility", "Choose who can vote"], ["Review and publish", "Confirm before submission"]] as const;
 export function CreateProposalForm() {
   const wallet = useWallet();
   const creation = useCreateProposal();
-  const created = ["accepted", "finalized"].includes(creation.stage);
+  const created = creation.stage === "finalized";
   const [step, setStep] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
   const [timezone, setTimezone] = useState("local timezone");
@@ -66,13 +67,12 @@ export function CreateProposalForm() {
     if (!e) setStep(step + 1);
   }
   return (
-    <div className="form-layout">
-      <aside className="step-sidebar">
-        <span className="eyebrow">A DECISION STARTS HERE</span>
+    <div className="creation-workflow">
+      <nav className="step-rail" aria-label="Proposal creation steps">
         <ol>
-          {steps.map((s, i) => (
+          {steps.map(([title, purpose], i) => (
             <li
-              key={s}
+              key={title}
               className={step === i ? "current" : step > i ? "complete" : ""}
             >
               <button
@@ -82,19 +82,16 @@ export function CreateProposalForm() {
                   setStep(i);
                   setError("");
                 }}
+                aria-current={step === i ? "step" : undefined}
               >
-                <span>0{i + 1}</span>
-                {s}
+                <span>{String(i + 1).padStart(2, "0")}</span><strong>{title}</strong>
               </button>
             </li>
           ))}
         </ol>
-        <p>
-          One wallet. One vote.
-          <br />
-          Eligibility on every proposal.
-        </p>
-      </aside>
+      </nav>
+      <p className="step-rail-support" aria-live="polite">{steps[step][1]}</p>
+      <div className="form-layout">
       <form
         className="panel creation-form"
         onSubmit={(e) => {
@@ -103,11 +100,11 @@ export function CreateProposalForm() {
           else submit();
         }}
       >
-        <span className="eyebrow">Step {step + 1} of 5</span>
+        <div className="creation-step-heading"><span>Step {step + 1} of 5</span><span>{steps[step][0]}</span></div>
         <h2 ref={heading} tabIndex={-1}>
           {
             [
-              "What are you asking the community to decide?",
+              "Define the proposal",
               "What choices can voters select?",
               "When can people vote?",
               "Who is allowed to vote?",
@@ -118,20 +115,21 @@ export function CreateProposalForm() {
         {step === 0 && (
           <>
             <p>
-              Create a publicly accessible proposal on {voxenConfig.networkName}. A Community workspace is not required. You may prepare a proposal on behalf of another entity; the connected wallet remains the onchain creator.
+              Provide the decision context and the outcome voters are being asked to determine. Your connected wallet will be recorded as the onchain creator.
             </p>
             <label>
-              Proposal title
+              Proposal title <span className="field-required">Required</span>
               <input
                 required
                 value={form.title}
                 maxLength={160}
                 onChange={(e) => set("title", e.target.value)}
-                placeholder="What should we decide?"
+                placeholder="Enter a clear proposal title"
               />
+              <small>Use a clear, decision-oriented title (up to 160 characters).</small>
             </label>
             <label>
-              Description
+              Description <span className="field-required">Required</span>
               <textarea
                 rows={6}
                 required
@@ -141,7 +139,7 @@ export function CreateProposalForm() {
               />
             </label>
             <section aria-labelledby="proposal-context-heading">
-              <h3 id="proposal-context-heading">Proposal Context</h3>
+              <h3 id="proposal-context-heading">Proposal context</h3>
               <p>Add supporting information that helps voters understand the decision.</p>
               <label>
                 Supporting reference (optional)
@@ -156,7 +154,7 @@ export function CreateProposalForm() {
         )}
         {step === 1 && (
           <>
-            <p>Keep options clear and distinct. Add between two and six.</p>
+            <p>Keep options clear and distinct. A proposal needs at least two and supports up to six.</p>
             {options.map((o, i) => (
               <div className="option-edit" key={i}>
                 <label>
@@ -198,8 +196,7 @@ export function CreateProposalForm() {
         {step === 2 && (
           <>
             <p>
-              Your local timezone: {timezone}. Choose when voting opens and
-              closes.
+              Times are entered in your local timezone ({timezone}) and submitted exactly as selected.
             </p>
             <div className="field-grid">
               <label>
@@ -228,7 +225,7 @@ export function CreateProposalForm() {
                 onChange={(e) => set("policy", e.target.value)}
               >
                 <option value="FINAL_ON_CAST">
-                  Cannot change after submission
+                  Final on cast — votes are final after submission
                 </option>
                 <option value="CHANGE_UNTIL_CLOSE">
                   Can change until voting closes
@@ -249,20 +246,18 @@ export function CreateProposalForm() {
         )}
         {step === 3 && (
           <>
-            <p>
-              Choose who can vote. Public voting is the default submission-safe option.
-            </p>
+            <p>Public voting is recommended for open governance and remains the default.</p>
             <fieldset className="mode-picker">
               <legend>Eligibility mode</legend>
-              <label><input type="radio" name="mode" checked={form.mode === "PUBLIC"} onChange={() => { set("mode", "PUBLIC"); setError(""); }} /> Public voting — anyone with a connected wallet can vote</label>
-              <label><input type="radio" name="mode" checked={form.mode === "POAP_EVENT"} onChange={() => { set("mode", "POAP_EVENT"); setError(""); }} /> POAP eligibility — Experimental — external verification may be unavailable.</label>
+              <label><input type="radio" name="mode" checked={form.mode === "PUBLIC"} onChange={() => { set("mode", "PUBLIC"); setError(""); }} /><span><strong>Public voting</strong><small>Any connected wallet can vote. The contract verifies lifecycle and duplicate rules.</small></span></label>
+              <label><input type="radio" name="mode" checked={form.mode === "POAP_EVENT"} onChange={() => { set("mode", "POAP_EVENT"); setError(""); }} /><span><strong>Experimental POAP eligibility</strong><small>External Gnosis verification may be unavailable and fails closed.</small></span></label>
             </fieldset>
             {form.mode === "POAP_EVENT" && <CredentialPicker form={form} onChange={(patch) => { setForm((f) => ({ ...f, ...patch })); setError(""); }} />}
           </>
         )}
         {step === 4 && (
           <>
-            <p>Check the details before creating your proposal on {voxenConfig.networkName}.</p>
+            <p>Confirm this decision before submitting it to {voxenConfig.networkName}.</p>
             <h3>{form.title}</h3>
             <p className="wrap">{form.description}</p>
             <dl className="review-list">
@@ -306,13 +301,13 @@ export function CreateProposalForm() {
                 </>
               )}
               {form.evidence.trim() && <>
-                <dt>Proposal Context</dt>
+                <dt>Proposal context</dt>
                 <dd><SupportingReference url={form.evidence} /></dd>
               </>}
             </dl>
             <div className="demo-notice">
-              Ordinary proposals publish immediately. Community Guard proposals
-              enter Review and require a current COMPLIANT Governance Review before publication.
+              Ordinary proposals publish immediately. Proposals that require
+              Governance Review enter review and need a current compliant result before publication.
             </div>
             {!wallet.isConnected ? (
               <p role="status">Connect your wallet to create this proposal.</p>
@@ -341,6 +336,7 @@ export function CreateProposalForm() {
                 ? "Preparing proposal"
                 : voteStageLabels[creation.stage]}
             </p>
+            <ConsensusTrace voting={creation} />
             {created && (
               <>
                 <h3>Proposal created</h3>
@@ -366,7 +362,7 @@ export function CreateProposalForm() {
                 </button>
               </>
             )}
-            <details>
+            <details className="creation-technical">
               <summary>Transaction details</summary>
               {created && (
                 <p>
@@ -426,6 +422,13 @@ export function CreateProposalForm() {
           </button>
         </div>
       </form>
+      <ProposalSummary form={form} options={options} timezone={timezone} />
+      </div>
     </div>
   );
+}
+
+function ProposalSummary({ form, options, timezone }: { form: ProposalForm; options: string[]; timezone: string }) {
+  const date = (value: string) => value ? new Date(value).toLocaleString() : "Not set";
+  return <aside className="proposal-summary" aria-label="Live proposal summary"><div className="panel-heading"><div><h2>Proposal summary</h2><p>Updates as you build the proposal.</p></div></div><dl><div><dt>Title</dt><dd>{form.title || "Untitled proposal"}</dd></div><div><dt>Choices</dt><dd>{options.filter(Boolean).length} of {options.length} named{options.some(Boolean) && <ol>{options.filter(Boolean).map((option, index) => <li key={`${option}-${index}`}>{option}</li>)}</ol>}</dd></div><div><dt>Voting window</dt><dd>{date(form.start)} — {date(form.end)}<small>{timezone}</small></dd></div><div><dt>Vote policy</dt><dd>{form.policy === "FINAL_ON_CAST" ? "Votes are final after submission" : "Changes allowed until close"}</dd></div><div><dt>Results</dt><dd>{form.visibility === "LIVE" ? "Visible while voting is open" : "Hidden until voting closes"}</dd></div><div><dt>Eligibility</dt><dd>{form.mode === "PUBLIC" ? "Public voting" : form.poapEventId ? `Experimental POAP event ${form.poapEventId}` : "Experimental POAP — not selected"}</dd></div><div><dt>Context</dt><dd>Public proposal · {form.evidence.trim() ? "Supporting reference included" : "No supporting reference"}</dd></div></dl></aside>;
 }

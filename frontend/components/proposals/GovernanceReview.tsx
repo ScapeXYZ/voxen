@@ -5,15 +5,11 @@ import { StatusBadge } from "@/components/governance/Badges";
 export function GovernanceReview({ p, space }: { p: Proposal; space?: Community }) {
   if (!p.guard && !p.guardRequired) return null;
   return (
-<section className="panel">
-            <div className="row">
-              <h3>Governance Review</h3>
+<section className="panel governance-review">
+            <div className="panel-heading">
+              <div><h2>Governance Review</h2><p>Validator review checks the proposal against Community rules and supplied evidence. It informs governance; it does not replace a vote or break ties.</p></div>
               {p.guard && <StatusBadge status={p.guard.outcome} />}
             </div>
-            <p className="small">
-              Governance Review compares this proposal with the Community’s rules and
-              uses validator consensus to produce a review.
-            </p>
             {p.guard && (
               <p>
                 {p.guard.outcome === "COMPLIANT"
@@ -38,10 +34,7 @@ export function GovernanceReview({ p, space }: { p: Proposal; space?: Community 
                 </div>
                 <h4>Evidence consistency</h4>
                 <p>{p.guard.evidenceConsistency}</p>
-                <p className="small muted">
-                  Independent GenLayer validators evaluate whether this proposal follows
-                  the Community’s governance rules.
-                </p>
+                <p className="small muted">This result is a review signal. Publication and finalization remain governed by the contract lifecycle.</p>
               </>
             ) : (
               <p className="muted">

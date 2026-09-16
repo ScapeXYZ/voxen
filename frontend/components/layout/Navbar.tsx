@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { VoxenLogo } from "./VoxenLogo";
@@ -8,29 +8,31 @@ import { ThemeToggle } from "./ThemeToggle";
 export function Navbar() {
   const path = usePathname();
   const [open, setOpen] = useState(false);
+  useEffect(() => setOpen(false), [path]);
+  const links = [
+    ["/explore", "Explore"],
+    ["/communities", "Communities"],
+    ["/live-proof", "Proof"],
+  ] as const;
   return (
     <header className="site-header">
       <div className="nav-shell">
         <VoxenLogo />
         <button
-          className="button menu-toggle"
+          className="nav-menu-toggle"
           aria-expanded={open}
           aria-controls="main-navigation"
           onClick={() => setOpen(!open)}
         >
-          Menu {open ? "−" : "+"}
+          <span className="sr-only">{open ? "Close" : "Open"} navigation</span>
+          <span aria-hidden="true">{open ? "Close" : "Menu"}</span>
         </button>
         <nav
           id="main-navigation"
           className={open ? "menu-open" : ""}
           aria-label="Main navigation"
         >
-          {[
-            ["/explore", "Explore"],
-            ["/communities", "Communities"],
-            ["/create", "Create Proposal"],
-            ["/live-proof", "Live Proof"],
-          ].map(([href, label]) => (
+          {links.map(([href, label]) => (
             <Link
               key={href}
               href={href}
@@ -42,28 +44,17 @@ export function Navbar() {
               }
             >
               {label}
-              {href === "/live-proof" && <span className="dot" />}
             </Link>
           ))}
+          <Link href="/create" className="nav-mobile-create">Create proposal</Link>
         </nav>
-        <ThemeToggle />
-        <WalletButton />
-        <span className="mobile-route">
-          {path.startsWith("/proposals/")
-            ? "Proposal"
-            : path.startsWith("/communities/")
-              ? "Community details"
-              : (
-                  {
-                    "/": "Home",
-                    "/explore": "Explore",
-                    "/communities": "Communities",
-                    "/create": "Create Proposal",
-                    "/create-community": "Create Community",
-                    "/live-proof": "Live Proof",
-                  } as Record<string, string>
-                )[path]}
-        </span>
+        <div className="nav-actions">
+          <Link href="/create" className="button primary nav-create">
+            Create proposal
+          </Link>
+          <ThemeToggle />
+          <WalletButton />
+        </div>
       </div>
     </header>
   );

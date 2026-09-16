@@ -37,101 +37,58 @@ export function ProposalDetails({
   const now = useVotingClock();
   const state = votingState(p, now);
   return (
-    <main id="main" className="shell page">
-      <Link href="/explore" className="eyebrow">
-        ← EXPLORE GOVERNANCE
-      </Link>
-      <div className="proposal-heading">
+    <main id="main" className="shell proposal-page">
+      <Link href="/explore" className="back-link">← Back to Explore</Link>
+      <header className="proposal-heading">
         <div className="card-tags">
           <StatusBadge status={state} />
-          {space ? <Link href={`/communities/${space.id}`}>{space.name} ↗</Link> : p.communityId ? <Link href={`/communities/${p.communityId}`}>Community {p.communityId} ↗</Link> : null}
+          {space ? <Link className="proposal-community" href={`/communities/${space.id}`}>{space.name}</Link> : p.communityId ? <Link className="proposal-community" href={`/communities/${p.communityId}`}>Community {p.communityId}</Link> : <span className="proposal-community">Public proposal</span>}
         </div>
         <h1>{p.title}</h1>
-        <div className="row start">
-          <span className="muted">Proposed by</span>
+        <p className="proposal-lede">{p.description}</p>
+        <div className="proposal-byline">
+          <span>Proposed by</span>
           <AddressDisplay address={p.creator} compact />
+          <span>Proposal <code>#{p.id}</code></span>
         </div>
-      </div>
-      <p role="status">{scheduleLabel(p, now)}</p>
-      {state === "ENDED" && <p>Voting has ended. Final result has not yet been finalized.</p>}
-      {liveState}
-      <p className="voting-window">
-        Voting opens {date(p.startsAt)} · Voting closes {date(p.endsAt)}
-      </p>
-      <div className="voter-summary">
-        <EligibilityPanel
-          eligibility={p.eligibility}
-          live={p.source === "live"}
-          check={eligibilityCheck}
-        />
-        <VotingPanel
-          proposal={p}
-          voting={voting}
-          eligibilityCheck={eligibilityCheck}
-        />
-      </div>
-      <LifecycleTimeline proposal={p} />
-      <div className="proposal-context">
-        <div>
+        <div className="proposal-deadlines"><div><span>Opens</span><strong>{date(p.startsAt)}</strong></div><div><span>Closes</span><strong>{date(p.endsAt)}</strong></div><div><span>Current state</span><strong>{scheduleLabel(p, now)}</strong></div></div>
+      </header>
+      <section className="decision-cockpit" aria-label="Proposal decision cockpit">
+        <div className="cockpit-vote">
+          <EligibilityPanel
+            eligibility={p.eligibility}
+            live={p.source === "live"}
+            check={eligibilityCheck}
+          />
+          <VotingPanel proposal={p} voting={voting} eligibilityCheck={eligibilityCheck} />
+        </div>
+        <aside className="cockpit-state">
+          {liveState}
+          <LifecycleTimeline proposal={p} />
+        </aside>
+      </section>
+      <section className="proposal-context" aria-label="Proposal context">
+        <section className="panel proposal-description-panel">
+          <h2>Proposal context</h2>
+          <p>{p.description}</p>
+          {p.evidenceUrl && <SupportingReference url={p.evidenceUrl} />}
+        </section>
+        <div className="proposal-context-grid">
           <section className="panel">
-            <span className="eyebrow">THE PROPOSAL</span>
-            <h2>What is being decided?</h2>
-            <p className="proposal-description">{p.description}</p>
-            {p.evidenceUrl && <SupportingReference url={p.evidenceUrl} />}
+            <h2>Voting rules</h2>
+            <dl className="metadata-grid">
+              <div><dt>Eligibility</dt><dd><EligibilityBadge eligibility={p.eligibility} /></dd></div>
+              <div><dt>Vote policy</dt><dd>{p.voteChangePolicy === "FINAL_ON_CAST" ? "One final vote per wallet" : "Changes allowed until close"}</dd></div>
+              <div><dt>Results</dt><dd>{p.resultVisibility === "LIVE" ? "Visible while voting is open" : "Hidden until voting closes"}</dd></div>
+            </dl>
           </section>
           <GovernanceReview p={p} space={space} />
-          <section className="panel">
-            <h3>Voting parameters</h3>
-            <dl className="metadata-grid">
-              <div>
-                <dt>Starts</dt>
-                <dd>{date(p.startsAt)}</dd>
-              </div>
-              <div>
-                <dt>Ends</dt>
-                <dd>{date(p.endsAt)}</dd>
-              </div>
-              <div>
-                <dt>Vote change policy</dt>
-                <dd>
-                  {p.voteChangePolicy === "FINAL_ON_CAST"
-                  ? "Your vote is final once submitted"
-                    : "You can change your vote until voting closes"}
-                </dd>
-              </div>
-              <div>
-                <dt>Result visibility</dt>
-                <dd>
-                  {p.resultVisibility === "LIVE"
-                    ? "Live results"
-                    : "Hidden until voting closes"}
-                </dd>
-              </div>
-            </dl>
-            <EligibilityBadge eligibility={p.eligibility} />
-            {p.eligibility.mode === "POAP_NFT" && (
-              <details>
-                <summary>Technical details</summary>
-                <dl>
-                  <dt>Credential contract</dt>
-                  <dd>
-                    <AddressDisplay address={p.eligibility.contract} />
-                  </dd>
-                  <dt>Chain / token ID</dt>
-                  <dd>
-                    {p.eligibility.chainId} /{" "}
-                    {p.eligibility.tokenId || "Not specified"}
-                  </dd>
-                  <dt>Credential type</dt>
-                  <dd>{p.eligibility.standard}</dd>
-                  <dt>Display label</dt>
-                  <dd>{p.eligibility.label}</dd>
-                </dl>
-              </details>
-            )}
-          </section>
         </div>
-      </div>
+        <details className="technical-details"><summary>Technical proposal parameters</summary>
+          <dl className="metadata-grid"><div><dt>Starts</dt><dd>{date(p.startsAt)}</dd></div><div><dt>Ends</dt><dd>{date(p.endsAt)}</dd></div><div><dt>Proposal ID</dt><dd><code>{p.id}</code></dd></div></dl>
+          {p.eligibility.mode === "POAP_NFT" && <dl className="metadata-grid"><div><dt>Credential contract</dt><dd><AddressDisplay address={p.eligibility.contract} /></dd></div><div><dt>Chain / token ID</dt><dd><code>{p.eligibility.chainId} / {p.eligibility.tokenId || "Not specified"}</code></dd></div></dl>}
+        </details>
+      </section>
     </main>
   );
 }

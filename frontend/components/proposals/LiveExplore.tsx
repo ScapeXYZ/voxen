@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowRight, Circle } from "lucide-react";
+import { Archive, CheckCircle2, Clock3, LayoutList, Radio, ShieldCheck } from "lucide-react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import type { Proposal } from "@/types/voxen";
 import { ProposalCard } from "./ProposalCard";
@@ -9,12 +9,12 @@ import { votingState } from "@/lib/voxen/lifecycle";
 import { useVotingClock } from "@/hooks/useVotingClock";
 
 const statuses = [
-  { id: "ALL", label: "All", preview: "All available proposals across every status." },
-  { id: "LIVE", label: "Live", preview: "Currently active and accepting votes." },
-  { id: "UPCOMING", label: "Upcoming", preview: "Scheduled proposals that have not started yet." },
-  { id: "ENDED", label: "Ended", preview: "Voting has ended and awaits final handling." },
-  { id: "FINALIZED", label: "Finalized", preview: "Completed proposals with confirmed outcomes." },
-  { id: "REVIEW", label: "Under review", preview: "Proposals undergoing Governance Review." },
+  { id: "ALL", label: "All", preview: "All available proposals across every status.", Icon: LayoutList },
+  { id: "LIVE", label: "Live", preview: "Currently active and accepting votes.", Icon: Radio },
+  { id: "UPCOMING", label: "Upcoming", preview: "Scheduled proposals that have not started yet.", Icon: Clock3 },
+  { id: "ENDED", label: "Ended", preview: "Voting has ended and awaits final handling.", Icon: Archive },
+  { id: "FINALIZED", label: "Finalized", preview: "Completed proposals with confirmed outcomes.", Icon: CheckCircle2 },
+  { id: "REVIEW", label: "Review", preview: "Proposals undergoing Governance Review.", Icon: ShieldCheck },
 ] as const;
 type StatusId = (typeof statuses)[number]["id"];
 
@@ -41,7 +41,7 @@ export function LiveExplore() {
 
   useEffect(() => {
     const index = statuses.findIndex((status) => status.id === filter);
-    cardRefs.current[index]?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    cardRefs.current[index]?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest", inline: "center" });
   }, [filter]);
 
   function handleKeys(event: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -59,17 +59,18 @@ export function LiveExplore() {
       {statuses.map((status, index) => {
         const active = filter === status.id;
         const count = countFor(status.id);
-        return <button key={status.id} ref={(node) => { cardRefs.current[index] = node; }} type="button" role="tab" id={`status-tab-${status.id}`} aria-controls="status-results" aria-selected={active} className={`status-standing-card status-${status.id.toLowerCase()}${active ? " is-active" : ""}`} onClick={() => setFilter(status.id)} onKeyDown={(event) => handleKeys(event, index)}>
-          <span className="status-card-top"><span className="status-indicator"><Circle aria-hidden="true" size={8} fill="currentColor" /> {status.id}</span><ArrowRight aria-hidden="true" size={16} /></span>
-          <span className="status-card-main"><strong>{count} {count === 1 ? "proposal" : "proposals"}</strong><span>{status.preview}</span></span>
-          <span className="status-card-view">View <ArrowRight aria-hidden="true" size={14} /></span>
+        const Icon = status.Icon;
+        return <button key={status.id} ref={(node) => { cardRefs.current[index] = node; }} type="button" role="tab" id={`status-tab-${status.id}`} aria-controls="status-results" aria-selected={active} tabIndex={active ? 0 : -1} className={`status-rail-tab status-${status.id.toLowerCase()}${active ? " is-active" : ""}`} onClick={() => setFilter(status.id)} onKeyDown={(event) => handleKeys(event, index)}>
+          <Icon aria-hidden="true" size={17} strokeWidth={1.8} />
+          <span className="status-rail-label">{status.label}</span>
+          <span className="status-rail-count" aria-label={`${count} ${count === 1 ? "proposal" : "proposals"}`}>{count}</span>
         </button>;
       })}
     </div>
     <div className="status-detail" id="status-results" role="tabpanel" aria-labelledby={`status-tab-${filter}`} tabIndex={-1}>
       <div className="status-detail-heading"><div><span className="eyebrow">Selected status</span><h2>{selected.label} proposals</h2></div><p>{selected.preview}</p></div>
-      {query.isPending && <p role="status">Discovering live proposals…</p>}
-      {query.isError ? <div role="alert"><p>{query.error.message}</p><button className="button" onClick={() => void query.refetch()}>Retry</button></div> : <div className="proposal-grid">{visible.map((proposal) => <ProposalCard key={proposal.id} proposal={proposal} />)}</div>}
+      {query.isPending && <div className="proposal-grid proposal-skeletons" role="status" aria-label="Discovering live proposals"><ProposalSkeleton /><ProposalSkeleton /><ProposalSkeleton /><ProposalSkeleton /></div>}
+      {query.isError ? <div className="status-error" role="alert"><ShieldCheck aria-hidden="true" size={22} /><div><strong>Discovery is temporarily unavailable.</strong><p>{query.error.message}</p></div><button className="button" onClick={() => void query.refetch()}>Retry discovery</button></div> : !query.isPending && <div className="proposal-grid">{visible.map((proposal) => <ProposalCard key={proposal.id} proposal={proposal} />)}</div>}
       {query.isSuccess && !visible.length && <div className="status-empty"><strong>No {selected.label.toLowerCase()} proposals right now.</strong><p>{filter === "LIVE" ? "Check Upcoming for proposals scheduled to begin later." : "Try another status or refresh the live proposal list."}</p></div>}
       {!query.isError && <div className="status-explorer-actions">
         {query.hasNextPage && <button className="button" disabled={query.isFetching} onClick={() => void query.fetchNextPage()}>Load more proposals</button>}
@@ -77,4 +78,8 @@ export function LiveExplore() {
       </div>}
     </div>
   </section>;
+}
+
+function ProposalSkeleton() {
+  return <div className="proposal-card proposal-skeleton" aria-hidden="true"><span /><span /><span /><span /><span /></div>;
 }

@@ -16,6 +16,7 @@ export function AddressDisplay({
         {compact ? `${address.slice(0, 6)}…${address.slice(-4)}` : address}
       </code>
       <button
+        type="button"
         aria-label="Copy address"
         title="Copy address"
         onClick={async () => {
@@ -30,7 +31,7 @@ export function AddressDisplay({
       >
         <Copy size={13} />
       </button>
-      <span role="status">
+      <span className="sr-only" role="status" aria-live="polite">
         {copied ? "Copied" : error ? "Copy unavailable" : ""}
       </span>
     </span>

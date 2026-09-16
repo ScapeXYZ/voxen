@@ -1,0 +1,1 @@
+export default function LoadingCommunities() { return <main id="main" className="shell page communities-page" aria-busy="true"><span className="eyebrow">Community governance</span><h1>Communities</h1><section className="community-message panel" role="status">Discovering Communities from the active contract…</section></main>; }

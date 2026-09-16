@@ -2,9 +2,9 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <main id="main" className="shell page">
-      <span className="eyebrow">404 / NOT FOUND</span>
+      <span className="eyebrow">Page not found</span>
       <h1>This decision isn’t here.</h1>
-      <p>The Community or proposal may not be available in the sample network.</p>
+      <p>The requested Community or proposal may be unavailable, or the address may be incorrect.</p>
       <Link className="button primary" href="/explore">
         Explore governance ↗
       </Link>

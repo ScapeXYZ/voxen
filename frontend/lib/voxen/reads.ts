@@ -25,6 +25,14 @@ export async function getSpace(id: string) {
     guardEnabled: bool(s.governance_guard_enabled), active: bool(s.active),
   };
 }
+export async function getSpaceIds(offset = 0, limit = 20) {
+  const page = record(await readVoxen("get_space_ids", [offset, limit]));
+  return {
+    ids: (page.ids as unknown[]).map(str),
+    total: integer(page.total),
+    nextOffset: page.next_offset === null ? null : integer(page.next_offset),
+  };
+}
 export async function getProposal(id: string): Promise<Proposal> {
   const p = record(await readVoxen("get_proposal", [id]));
   if (p.id !== id || !Array.isArray(p.options) || p.options.length < 2) throw new Error("Invalid proposal response");

@@ -20,6 +20,7 @@ export async function readVoxen(
     | "get_proposal_result"
     | "check_eligibility"
     | "get_space"
+    | "get_space_ids"
     | "get_governance_review"
     | "get_latest_governance_review",
   args: (string | number)[],
