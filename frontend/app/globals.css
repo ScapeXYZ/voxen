@@ -3668,3 +3668,67 @@ h1, h2, h3, h4, p, dd, li { word-break: normal; overflow-wrap: normal; hyphens: 
   .lifecycle-card-list { grid-template-columns: 1fr; }
   .lifecycle-card-item:nth-child(n) { grid-column: 1 / -1; }
 }
+
+/* Landing proposal presentation */
+.landing-proposals-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 48px;
+  align-items: end;
+}
+.landing-proposals-intro { min-width: 0; }
+.landing-proposals-intro .eyebrow { margin: 0; }
+.landing-proposals-intro h2 {
+  margin: 16px 0;
+  font-size: clamp(38px, 3vw, 46px);
+  font-weight: 625;
+  line-height: 1.12;
+}
+.landing-proposals-intro > p:not(.eyebrow):not(.collection-note) {
+  max-width: 720px;
+  margin: 0;
+  font-size: 16px;
+}
+.landing-proposals-intro .collection-note {
+  margin: 26px 0 0;
+  font-size: 13px;
+}
+.landing-proposals-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.landing-proposals-action:hover { color: var(--consensus); }
+.live-preview .landing-proposals-header + * { margin-top: 24px; }
+
+.proof-reference > .connected-governance-state {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  margin: 18px 0 0;
+  padding: 18px 0 0;
+  border-top: 1px solid #315148;
+  color: #bed2c6;
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.connected-governance-state .live-dot { flex: none; margin: 0; }
+
+@media (max-width: 800px) {
+  .landing-proposals-header { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .landing-proposals-action { justify-self: start; }
+}
+
+@media (max-width: 360px) {
+  .proof-reference > .connected-governance-state { white-space: normal; }
+}
