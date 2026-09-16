@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useSyncExternalStore } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@/lib/genlayer/WalletProvider";
 import { voxenConfig } from "@/lib/voxen/config";
 import { submitVote } from "@/lib/voxen/writes";
@@ -64,51 +64,6 @@ export function useVoxenVote(id: string) {
       /* No resumable transaction. */
     }
   }, [key]);
-  const hash = state.txId || state.evmHash;
-  const kind = state.txId ? "genlayer" : "evm";
-  const status = useQuery({
-    queryKey: ["voxen-transaction", key, hash, kind],
-    queryFn: async () => {
-      const response = await fetch(
-        `/api/voxen/transactions/${hash}?kind=${kind}`,
-        { cache: "no-store", signal: AbortSignal.timeout(25_000) },
-      );
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.technical || body.message);
-      return body as { stage: VoteStage; txId?: string; technical?: string };
-    },
-    enabled: !!hash && state.stage !== "finalized" && state.stage !== "failed",
-    retry: false,
-    refetchInterval:
-      state.stage === "finalized" || state.stage === "failed" ? false : 4000,
-    refetchOnWindowFocus: true,
-  });
-  useEffect(() => {
-    if (!status.data) return;
-    const previous = states.get(key) || idle;
-    const next = status.data;
-    save(key, {
-      ...previous,
-      ...next,
-      message:
-        next.stage === "failed"
-          ? "Your vote failed and was not recorded."
-          : undefined,
-    });
-    if (
-      ["accepted", "finalized", "failed"].includes(next.stage) &&
-      next.stage !== previous.stage
-    ) {
-      // Includes tallies, proposal lifecycle and the current wallet's ballot.
-      void cache.invalidateQueries({
-        queryKey: ["voxen-proposal", voxenConfig.rpc, voxenConfig.contract, id],
-      });
-      void cache.invalidateQueries({
-        queryKey: ["voxen-vote", voxenConfig.rpc, voxenConfig.contract, id],
-      });
-      void cache.invalidateQueries({ queryKey: ["voxen-eligibility"] });
-    }
-  }, [status.data, key, cache, id]);
   const pending = [
     "preparing",
     "submitting",
@@ -135,8 +90,15 @@ export function useVoxenVote(id: string) {
           ...update,
           stage: ["accepted", "finalized", "failed"].includes(previous.stage)
             ? previous.stage
-            : update.stage,
+          : update.stage,
         });
+        // The read model is refreshed only once execution is finalized. An
+        // ACCEPTED/decided checkpoint is not a successful vote.
+        if (update.stage === "finalized") {
+          void cache.invalidateQueries({ queryKey: ["voxen-proposal", voxenConfig.rpc, voxenConfig.contract, id] });
+          void cache.invalidateQueries({ queryKey: ["voxen-vote", voxenConfig.rpc, voxenConfig.contract, id] });
+          void cache.invalidateQueries({ queryKey: ["voxen-eligibility"] });
+        }
       });
     } catch (error) {
       const previous = states.get(key) || idle;
@@ -156,8 +118,8 @@ export function useVoxenVote(id: string) {
     ...state,
     pending,
     cast,
-    monitoringError: status.error?.message,
-    retryStatus: status.refetch,
+    monitoringError: undefined,
+    retryStatus: async () => undefined,
   };
 }
 export type VoteController = ReturnType<typeof useVoxenVote>;

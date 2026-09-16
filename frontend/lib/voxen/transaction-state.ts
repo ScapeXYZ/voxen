@@ -11,10 +11,10 @@ export type VoteStage =
 export const voteStageLabels: Record<VoteStage, string> = {
   idle: "",
   preparing: "Preparing vote",
-  submitting: "Submitting",
-  submitted: "Submitted",
-  processing: "Consensus processing",
-  accepted: "Accepted by GenLayer",
+  submitting: "Waiting for wallet approval",
+  submitted: "Transaction submitted",
+  processing: "GenLayer consensus processing",
+  accepted: "GenLayer consensus processing",
   finalized: "Finalized",
   failed: "Failed",
 };
@@ -40,11 +40,6 @@ export function transactionStage(tx: GenLayerTransaction): VoteStage {
     tx.txExecutionResult === 1 ||
     tx.txExecutionResultName === "FINISHED_WITH_RETURN";
   if (success && (status === 7 || status === "FINALIZED")) return "finalized";
-  if (
-    success &&
-    (status === 5 ||
-      status === "ACCEPTED")
-  )
-    return "accepted";
+  if (success && (status === 5 || status === "ACCEPTED")) return "processing";
   return "processing";
 }

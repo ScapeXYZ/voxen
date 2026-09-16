@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useWallet } from "@/lib/genlayer/WalletProvider";
 import { Wallet } from "lucide-react";
+import { voxenConfig } from "@/lib/voxen/config";
 export function WalletButton() {
   const w = useWallet();
   const [message, setMessage] = useState("");
@@ -58,7 +59,7 @@ export function WalletButton() {
                 disabled={w.isLoading}
                 onClick={connect}
               >
-                Switch to GenLayer Bradbury
+                Switch to {voxenConfig.networkName}
               </button>
             )}
             <span role="status">{message}</span>

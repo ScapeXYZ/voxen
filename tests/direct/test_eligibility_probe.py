@@ -22,10 +22,7 @@ def test_context(probe, direct_vm):
     assert result["sender_address"] == result["caller"]
     assert result["contract_address"] == result["contract"]
     assert result["chain_id"] == result["runtime_chain_id"] == direct_vm._chain_id
-    raw = result["message_raw"]
-    assert int(raw["chain_id"]) == result["runtime_chain_id"]
-    for field in ("sender_address", "origin_address", "contract_address"):
-        assert raw[field].as_hex == result[field]
+    assert isinstance(result["runtime_datetime"], str)
     assert calldata.decode(calldata.encode(result)) == result
     assert_unproven_network(result, direct_vm._chain_id)
 
@@ -36,8 +33,6 @@ def test_context_preserves_distinct_origin(probe, direct_vm):
     result = probe.context()
     assert result["origin_address"] == origin.as_hex
     assert result["sender_address"].lower() == "0x" + WALLET.hex()
-    assert result["message_raw"]["origin_address"].as_hex == result["origin_address"]
-    assert result["message_raw"]["sender_address"].as_hex == result["sender_address"]
 
 
 def assert_unproven_network(result, chain_id):
@@ -87,7 +82,6 @@ def test_raw_transport(probe, monkeypatch, kind, token, selector, balance):
 def test_malformed_response_rejected(probe, kind, token, monkeypatch, raw):
     import genlayer.gl._internal.gl_call as calls
     from genlayer.py.types import Lazy
-    from genlayer import gl
     monkeypatch.setattr(calls, "gl_call_generic", lambda request, decode: Lazy(lambda: decode(raw)))
     with pytest.raises(gl.vm.UserError, match="Malformed"):
         probe.nft_candidate(TARGET, "0x" + WALLET.hex(), kind, token, True)
@@ -196,7 +190,7 @@ def test_record_native_candidate(probe, direct_vm, threshold, expected):
     assert record["observed_candidate_wei"] == "10"
     assert record["threshold_wei"] == str(threshold)
     assert record["candidate_meets_threshold"] is expected
-    assert record["runtime_datetime"] == gl.message_raw.get("datetime")
+    assert isinstance(record["runtime_datetime"], str)
     assert record["verification_status"] == "UNPROVEN_EOA_BALANCE_SEMANTICS"
     assert_unproven_network(record, direct_vm._chain_id)
     # Returned data is detached from stored state; views cannot replace the record.
@@ -258,13 +252,11 @@ def test_write_accepts_no_caller_or_balance(probe):
     assert probe.get_last_native_candidate() is None
 
 
-@pytest.mark.parametrize("timestamp", [None, 123, "2026-09-08T12:00:00Z"])
-def test_record_datetime_is_optional_runtime_metadata(probe, direct_vm, monkeypatch, timestamp):
-    from genlayer import gl
+def test_record_datetime_uses_deterministic_runtime_clock(probe, direct_vm):
     direct_vm.deal(WALLET, 10)
-    monkeypatch.setitem(gl.message_raw, "datetime", timestamp)
+    direct_vm.warp("2026-09-08T12:00:00Z")
     probe.record_native_candidate(1)
-    assert probe.get_last_native_candidate()["runtime_datetime"] == (timestamp if type(timestamp) is str else None)
+    assert probe.get_last_native_candidate()["runtime_datetime"] == "2026-09-08T12:00:00+00:00"
 
 
 @pytest.mark.parametrize("target", [

@@ -1,4 +1,4 @@
-# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
+# { "Depends": "py-genlayer:5jycge4q8k23462jtb0b9fyey1s9qz928sz2nbrd9mg4sxqg2qng" }
 """Voxen V0.6: governance compliance consensus alongside deterministic voting.
 
 Times are nonnegative integer Unix seconds. Voting enforces [start, end).
@@ -6,91 +6,32 @@ Published voting is time-driven; finalization explicitly records the result.
 Guard REVIEW -> PUBLISHED requires an accepted current review and Space policy approval.
 Space association and the Guard snapshot are fixed at proposal creation.
 Guard REVIEW edits start a new revision after a completed review; publication freezes edits.
-Creation timestamps are omitted: direct VM message_raw datetime is not refreshed
-by warp(), so it cannot reliably test per-transaction creation times.
+Creation timestamps use the deterministic GenVM transaction timestamp.
 """
 import json
 import datetime
 import ipaddress
 from urllib.parse import urlsplit
-from genlayer.gl.nondet import NondetException
-from genlayer import *
-from genlayer.py.evm.calldata import MethodEncoder
-import genlayer.gl._internal.gl_call as gl_call
+from genlayer.nondet import NondetException
+import genlayer as gl
 
 
-# Deployment trust boundary: Bradbury EVM, NOT gl.message.chain_id (reports 1).
-TRUSTED_EVM_CHAIN_ID = 4221
-
-
-@gl.evm.contract_interface
-class EthContract:
-    """SDK-native balance proxy; valid for an address, not only a contract."""
-    class View:
-        pass
-
-    class Write:
-        pass
-
-
-def _native_balance(owner):
-    # Use the pinned SDK's address-balance proxy rather than its private WASI
-    # module.  genlayer-py-std implements this property with the runtime's
-    # native balance primitive.
-    observed = int(EthContract(owner).balance)
-    if type(observed) is not int or not 0 <= observed < 2**256:
-        raise gl.vm.UserError("Native balance verification unavailable")
-    return observed
-
-
-def _credential_balance(target, owner, standard, token_id):
-    if standard == "ERC721":
-        if token_id is not None:
-            raise gl.vm.UserError("ERC721 collection check has no token ID")
-        types, args = (Address,), (owner,)
-    elif standard == "ERC1155":
-        if type(token_id) is not int or not 0 <= token_id < 2**256:
-            raise gl.vm.UserError("Invalid token ID")
-        types, args = (Address, u256), (owner, u256(token_id))
-    else:
-        raise gl.vm.UserError("Unsupported credential type")
-    calldata = MethodEncoder("balanceOf", types, u256).encode_call(args)
-
-    def decode_balance(raw):
-        if type(raw) is not bytes or len(raw) != 32:
-            raise gl.vm.UserError("Malformed uint256 response")
-        return int.from_bytes(raw, "big")
-
-    observed = gl_call.gl_call_generic(
-        {"EthCall": {"address": target, "calldata": calldata}}, decode_balance).get()
-    if type(observed) is not int or not 0 <= observed < 2**256:
-        raise gl.vm.UserError("Credential verification unavailable")
-    return observed
-
-
-class Voxen(gl.Contract):
-    space_count: u256
-    proposal_count: u256
-    spaces: TreeMap[str, str]
-    proposals: TreeMap[str, str]
-    votes: TreeMap[str, str]
-    tallies: TreeMap[str, str]
-    results: TreeMap[str, str]
-    review_count: u256
-    reviews: TreeMap[str, str]
-    latest_reviews: TreeMap[str, str]
+class Voxen(gl.contract.Contract):
+    space_count: gl.u256
+    proposal_count: gl.u256
+    spaces: gl.storage.TreeMap[str, str]
+    proposals: gl.storage.TreeMap[str, str]
+    votes: gl.storage.TreeMap[str, str]
+    tallies: gl.storage.TreeMap[str, str]
+    results: gl.storage.TreeMap[str, str]
+    review_count: gl.u256
+    reviews: gl.storage.TreeMap[str, str]
+    latest_reviews: gl.storage.TreeMap[str, str]
 
     def __init__(self):
-        self.space_count = u256(0)
-        self.proposal_count = u256(0)
-        self.spaces = TreeMap()
-        self.proposals = TreeMap()
-        self.votes = TreeMap()
-        self.tallies = TreeMap()
-        self.results = TreeMap()
-        self.review_count = u256(0)
-        self.reviews = TreeMap()
-        self.latest_reviews = TreeMap()
+        self.space_count = gl.u256(0)
+        self.proposal_count = gl.u256(0)
+        self.review_count = gl.u256(0)
 
     def _sender(self):
         return str(gl.message.sender_address)
@@ -147,7 +88,7 @@ class Voxen(gl.Contract):
             "governance_guard_enabled": governance_guard_enabled,
             "active": True,
         })
-        self.space_count = u256(next_count)
+        self.space_count = gl.u256(next_count)
         return space_id
 
     @gl.public.write
@@ -196,15 +137,10 @@ class Voxen(gl.Contract):
                         evidence_url: str | None = None, governance_guard_required: bool = False,
                         result_visibility: str = "LIVE",
                         vote_change_policy: str = "FINAL_ON_CAST",
-                        minimum_gen_balance: int | None = None,
-                        credential_contract_address: str | None = None,
-                        credential_type: str | None = None,
-                        credential_token_id: int | None = None) -> str:
+                        poap_event_id: int | None = None) -> str:
         self._validate_proposal(title, options, start_time, end_time,
                                 result_visibility, vote_change_policy)
-        eligibility = self._eligibility_config(
-            eligibility_mode, minimum_gen_balance, credential_contract_address,
-            credential_type, credential_token_id)
+        eligibility = self._eligibility_config(eligibility_mode, poap_event_id)
         self._bool(governance_guard_required)
         if space_id is not None:
             space = self._available_space(space_id)
@@ -223,7 +159,7 @@ class Voxen(gl.Contract):
             "result_visibility": result_visibility, "vote_change_policy": vote_change_policy,
             "eligibility": eligibility,
         })
-        self.proposal_count = u256(next_count)
+        self.proposal_count = gl.u256(next_count)
         return proposal_id
 
     @gl.public.write
@@ -259,9 +195,7 @@ class Voxen(gl.Contract):
 
     @gl.public.view
     def get_proposal(self, proposal_id: str) -> dict:
-        proposal = self._proposal(proposal_id)
-        proposal["effective_status"] = self._effective_status(proposal)
-        return proposal
+        return self._proposal(proposal_id)
 
     @gl.public.view
     def get_proposal_ids(self, offset: int = 0, limit: int = 20) -> dict:
@@ -271,6 +205,17 @@ class Voxen(gl.Contract):
         total = int(self.proposal_count)
         end = min(offset + limit, total)
         return {"ids": ["proposal-" + str(total - i) for i in range(offset, end)],
+                "total": total, "next_offset": end if end < total else None}
+
+    @gl.public.view
+    def get_space_ids(self, offset: int = 0, limit: int = 20) -> dict:
+        """Newest-first Space IDs, with the same bounded pagination ABI as proposals."""
+        self._uint256(offset, "offset")
+        if type(limit) is not int or not 1 <= limit <= 50:
+            raise gl.vm.UserError("Limit must be between 1 and 50")
+        total = int(self.space_count)
+        end = min(offset + limit, total)
+        return {"ids": ["space-" + str(total - i) for i in range(offset, end)],
                 "total": total, "next_offset": end if end < total else None}
 
     def _effective_status(self, proposal):
@@ -290,7 +235,7 @@ class Voxen(gl.Contract):
         Strings may be lower/upper hex; mixed case must have valid EIP-55.
         Zero addresses are rejected.
         """
-        if type(value) is Address:
+        if type(value) is gl.Address:
             value = value.as_hex
         elif type(value) is int:
             if not 0 < value < 2**160:
@@ -302,13 +247,13 @@ class Voxen(gl.Contract):
                 or any(c not in "0123456789abcdefABCDEF" for c in value[2:])):
             raise gl.vm.UserError("Invalid EVM address")
 
-        normalized = Address(value).as_hex
+        normalized = gl.Address(value).as_hex
         body = value[2:]
 
         if body != body.lower() and body != body.upper() and value != normalized:
             raise gl.vm.UserError("Invalid EVM address checksum")
 
-        if Address(value).as_bytes == bytes(20):
+        if gl.Address(value).as_bytes == bytes(20):
             raise gl.vm.UserError("Zero EVM address is not allowed")
 
         return normalized
@@ -317,51 +262,168 @@ class Voxen(gl.Contract):
         if type(value) is not int or not (1 if positive else 0) <= value < 2**256:
             raise gl.vm.UserError("Invalid " + label)
 
-    def _eligibility_config(self, mode, minimum_gen_balance, contract, credential_type, token_id):
-        """GEN thresholds are integer wei. Large integers serialize as decimal strings."""
-        credential_fields = (contract, credential_type, token_id)
-        if mode == "GEN":
-            if any(v is not None for v in credential_fields):
-                raise gl.vm.UserError("GEN does not accept credential fields")
-            self._uint256(minimum_gen_balance, "minimum GEN balance", positive=True)
-            return {"mode": "GEN", "minimum_gen_balance": str(minimum_gen_balance)}
-        if mode == "POAP_NFT":
-            if minimum_gen_balance is not None:
-                raise gl.vm.UserError("POAP_NFT does not accept GEN fields")
-            normalized = self._evm_address(contract)
-            if credential_type == "ERC721":
-                if token_id is not None:
-                    raise gl.vm.UserError("ERC721 collection eligibility does not accept token ID")
-                scope = "COLLECTION"
-            elif credential_type == "ERC1155":
-                self._uint256(token_id, "credential token ID")
-                scope = "TOKEN_ID"
-            else:
-                raise gl.vm.UserError("Unsupported credential type")
-            return {"mode": "POAP_NFT", "credential_contract_address": normalized,
-                    "credential_type": credential_type, "credential_scope": scope,
-                    "credential_token_id": str(token_id) if token_id is not None else None}
-        raise gl.vm.UserError("Unsupported eligibility mode")
+    def _eligibility_config(self, mode, event_id):
+        """PUBLIC is submission-safe; POAP remains an experimental credential mode."""
+        if mode == "PUBLIC":
+            if event_id is not None:
+                raise gl.vm.UserError("PUBLIC does not accept credential fields")
+            return {"mode": "PUBLIC"}
+        if mode != "POAP_EVENT":
+            raise gl.vm.UserError("Unsupported eligibility mode")
+        self._uint256(event_id, "POAP event ID")
+        return {"mode": "POAP_EVENT", "poap_event_id": str(event_id),
+                "chain_id": 100, "scan_cap": 128}
 
     @gl.public.view
     def get_proposal_eligibility(self, proposal_id: str) -> dict:
         return self._proposal(proposal_id)["eligibility"]
 
-    def _verify_gen_eligibility(self, config, wallet):
-        observed = _native_balance(Address(self._evm_address(wallet)))
-        return {"eligible": observed >= int(config["minimum_gen_balance"]),
-                "observed_balance": str(observed), "verification_status": "VERIFIED",
-                "network_verification_status": "UNPROVEN_RUNTIME_CHAIN_ID"}
+    # The official public Gnosis RPC is the sole data source.  GenVM validators
+    # independently repeat every read during consensus; this improves
+    # submission availability but is not multi-provider RPC consensus.
+    _POAP_RPC = "https://rpc.gnosischain.com"
+    _POAP_CONTRACT = "0x22c1f6050e56d2876009903609a2cc3fef83b415"
+    _POAP_SCAN_CAP = 128
 
-    def _verify_credential_eligibility(self, config, wallet):
-        token = config["credential_token_id"]
-        observed = _credential_balance(
-            Address(self._evm_address(config["credential_contract_address"])),
-            Address(self._evm_address(wallet)), config["credential_type"],
-            int(token) if token is not None else None)
-        return {"eligible": observed > 0, "observed_balance": str(observed),
-                "verification_status": "VERIFIED",
-                "network_verification_status": "UNPROVEN_RUNTIME_CHAIN_ID"}
+    def _poap_error(self, reason):
+        return {"status": reason, "eligible": False}
+
+    def _poap_json(self, response):
+        if not 200 <= response.status < 300 or type(response.body) is not bytes:
+            raise ValueError("POAP_RPC_UNAVAILABLE")
+        if not 0 < len(response.body) <= 262144:
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+        def unique_fields(pairs):
+            decoded = {}
+            for key, value in pairs:
+                if key in decoded:
+                    raise ValueError("POAP_MALFORMED_RESPONSE")
+                decoded[key] = value
+            return decoded
+        try:
+            return json.loads(response.body.decode("utf-8"), object_pairs_hook=unique_fields)
+        except (UnicodeDecodeError, ValueError, TypeError):
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+
+    def _poap_rpc(self, endpoint, request):
+        try:
+            response = gl.nondet.web.post(endpoint, body=json.dumps(request, separators=(",", ":")),
+                                          headers={"content-type": "application/json"})
+            return self._poap_json(response)
+        except ValueError:
+            raise
+        except Exception:
+            raise ValueError("POAP_RPC_UNAVAILABLE")
+
+    def _poap_result(self, reply, request_id):
+        if type(reply) is not dict or set(reply) - {"jsonrpc", "id", "result", "error"}:
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+        if reply.get("jsonrpc") != "2.0" or reply.get("id") != request_id:
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+        if "error" in reply:
+            raise ValueError("POAP_RPC_UNAVAILABLE")
+        if "result" not in reply:
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+        return reply["result"]
+
+    def _poap_single(self, endpoint, method, params):
+        return self._poap_result(self._poap_rpc(endpoint, {"jsonrpc": "2.0", "id": 1,
+                                                            "method": method, "params": params}), 1)
+
+    def _poap_chain_id(self):
+        result = self._poap_single(self._POAP_RPC, "eth_chainId", [])
+        if type(result) is not str or result.lower() != "0x64":
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+
+    def _poap_batch(self, endpoint, calls):
+        requests = [{"jsonrpc": "2.0", "id": number + 1, "method": "eth_call",
+                     "params": [{"to": self._POAP_CONTRACT, "data": data}, block]}
+                    for number, (data, block) in enumerate(calls)]
+        replies = self._poap_rpc(endpoint, requests)
+        if type(replies) is not list or len(replies) != len(requests):
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+        by_id = {}
+        for reply in replies:
+            if type(reply) is not dict or type(reply.get("id")) is not int or reply["id"] in by_id:
+                raise ValueError("POAP_MALFORMED_RESPONSE")
+            by_id[reply["id"]] = reply
+        if set(by_id) != set(range(1, len(requests) + 1)):
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+        return [self._poap_result(by_id[number + 1], number + 1) for number in range(len(requests))]
+
+    def _poap_block(self, endpoint, block):
+        result = self._poap_single(endpoint, "eth_getBlockByNumber", [block, False])
+        if type(result) is not dict or type(result.get("number")) is not str or type(result.get("hash")) is not str:
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+        try:
+            number = int(result["number"], 16)
+        except ValueError:
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+        digest = result["hash"]
+        if (number < 0 or len(digest) != 66 or not digest.startswith("0x")
+                or any(char not in "0123456789abcdefABCDEF" for char in digest[2:])):
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+        return number, digest.lower()
+
+    def _poap_ownership(self, wallet, event_id, block_number):
+        wallet_word = wallet[2:].lower().rjust(64, "0")
+        block = hex(block_number)
+        balance_calls = [("0x70a08231" + wallet_word, block)]
+        balances = self._poap_batch(self._POAP_RPC, balance_calls)
+        if any(type(value) is not str or len(value) != 66 or not value.startswith("0x")
+               or any(char not in "0123456789abcdefABCDEF" for char in value[2:]) for value in balances):
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+        balance = int(balances[0], 16)
+        if balance > self._POAP_SCAN_CAP:
+            raise ValueError("POAP_SCAN_LIMIT_EXCEEDED")
+        if balance == 0:
+            return False
+        ownership_calls = [("0x2f745c59" + wallet_word + format(index, "064x"), block)
+                           for index in range(balance)]
+        tokens = self._poap_batch(self._POAP_RPC, ownership_calls)
+        if any(type(value) is not str or len(value) != 66 or not value.startswith("0x")
+               or any(char not in "0123456789abcdefABCDEF" for char in value[2:]) for value in tokens):
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+        token_calls = [("0x127a5298" + value[2:], block) for value in tokens]
+        events = self._poap_batch(self._POAP_RPC, token_calls)
+        if any(type(value) is not str or len(value) != 66 or not value.startswith("0x")
+               or any(char not in "0123456789abcdefABCDEF" for char in value[2:])
+               for value in events):
+            raise ValueError("POAP_MALFORMED_RESPONSE")
+        for value in events:
+            if int(value, 16) == event_id:
+                return True
+        return False
+
+    def _poap_leader_evidence(self, config, wallet):
+        try:
+            self._poap_chain_id()
+            number, digest = self._poap_block(self._POAP_RPC, "finalized")
+            block = self._poap_block(self._POAP_RPC, hex(number))
+            if block != (number, digest):
+                return self._poap_error("POAP_ENDPOINT_DISAGREEMENT")
+            return {"status": "OK", "eligible": self._poap_ownership(wallet, int(config["poap_event_id"]), number),
+                    "block_number": number, "block_hash": digest}
+        except ValueError as error:
+            return self._poap_error(str(error))
+
+    def _poap_validator_evidence(self, config, wallet, candidate):
+        if type(candidate) is not dict or candidate.get("status") != "OK":
+            return False
+        number, digest = candidate.get("block_number"), candidate.get("block_hash")
+        if type(number) is not int or number < 0 or type(digest) is not str:
+            return False
+        try:
+            self._poap_chain_id()
+            finalized = self._poap_block(self._POAP_RPC, "finalized")
+            block = self._poap_block(self._POAP_RPC, hex(number))
+            if finalized != (number, digest) or block != (number, digest):
+                return False
+            return candidate == {"status": "OK",
+                                 "eligible": self._poap_ownership(wallet, int(config["poap_event_id"]), number),
+                                 "block_number": number, "block_hash": digest}
+        except ValueError:
+            return False
 
     def _check_eligibility_internal(self, proposal_id, wallet):
         """Authoritative eligibility verification shared by views and writes.
@@ -374,38 +436,64 @@ class Voxen(gl.Contract):
         normalized = self._evm_address(wallet)
         result = dict(config)
         result["wallet"] = normalized
-        if config["mode"] == "GEN":
-            result.update(self._verify_gen_eligibility(config, normalized))
-        elif config["mode"] == "POAP_NFT":
-            result.update(self._verify_credential_eligibility(config, normalized))
-        else:
+        if config["mode"] == "PUBLIC":
+            result.update(status="PUBLIC_ELIGIBLE", eligible=True, advisory=True,
+                          message="Advisory preview only; cast_vote rechecks authoritatively.")
+            return result
+        if config["mode"] != "POAP_EVENT":
             raise gl.vm.UserError("Unsupported eligibility mode")
+        result.update(self._poap_leader_evidence(config, normalized))
+        if result["status"] == "OK" and result["eligible"] is False:
+            result["status"] = "POAP_NO_MATCHING_EVENT"
+        result["advisory"] = True
+        result["message"] = "Advisory preview only; cast_vote rechecks authoritatively."
         return result
+
+    def _verify_poap_consensus(self, proposal_id, wallet):
+        """Authorize a cast only after leader/validator canonical evidence agrees."""
+        config = self._proposal(proposal_id)["eligibility"]
+        if config["mode"] != "POAP_EVENT":
+            raise gl.vm.UserError("Unsupported eligibility mode")
+
+        def leader_fn():
+            return self._poap_leader_evidence(config, wallet)
+
+        def validator_fn(leader):
+            if not isinstance(leader, gl.vm.Return):
+                return False
+            evidence = leader.calldata
+            # A leader failure remains a fail-closed, typed result.  A successful
+            # candidate must be independently checked at its exact number/hash.
+            if type(evidence) is dict and evidence.get("status") != "OK":
+                return evidence == self._poap_leader_evidence(config, wallet)
+            return self._poap_validator_evidence(config, wallet, evidence)
+
+        evidence = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+        if type(evidence) is not dict or evidence.get("status") != "OK":
+            reason = evidence.get("status") if type(evidence) is dict else None
+            if reason not in ("POAP_NO_MATCHING_EVENT", "POAP_RPC_UNAVAILABLE",
+                              "POAP_ENDPOINT_DISAGREEMENT", "POAP_MALFORMED_RESPONSE",
+                              "POAP_SCAN_LIMIT_EXCEEDED"):
+                reason = "POAP_RPC_UNAVAILABLE"
+            raise gl.vm.UserError(reason)
+        if evidence.get("eligible") is not True:
+            raise gl.vm.UserError("POAP_NO_MATCHING_EVENT")
+        return evidence
+
+    def _verify_eligibility_consensus(self, proposal_id, wallet):
+        """PUBLIC needs no credential RPC; POAP remains consensus-verified."""
+        if self._proposal(proposal_id)["eligibility"]["mode"] == "PUBLIC":
+            return
+        self._verify_poap_consensus(proposal_id, wallet)
 
     @gl.public.view
     def check_eligibility(self, proposal_id: str, wallet: str) -> dict:
-        """Preview only; casts recheck the transaction sender on-chain."""
+        """Advisory preview only; cast_vote rechecks authoritatively."""
         return self._check_eligibility_internal(proposal_id, wallet)
 
     def _transaction_time(self):
-        """Integer Unix seconds from transaction context, never host datetime.now().
-
-        Direct VM warp() does not refresh message_raw datetime in genlayer-test
-        0.29.2. Tests explicitly inject that context field and restore it.
-        """
-        raw = gl.message_raw.get("datetime")
-        if not isinstance(raw, str):
-            raise gl.vm.UserError("Missing transaction datetime")
-        try:
-            timestamp = datetime.datetime.fromisoformat(raw)
-        except ValueError:
-            raise gl.vm.UserError("Invalid transaction datetime")
-        if timestamp.tzinfo is None:
-            raise gl.vm.UserError("Transaction datetime must include timezone")
-        delta = timestamp - datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
-        if delta.days < 0:
-            raise gl.vm.UserError("Transaction datetime precedes Unix epoch")
-        return delta.days * 86400 + delta.seconds
+        """Integer Unix seconds from GenVM's deterministic transaction clock."""
+        return int(datetime.datetime.now(datetime.timezone.utc).timestamp())
 
     def _tallies(self, proposal):
         return json.loads(self.tallies.get(proposal["id"]) or
@@ -413,8 +501,7 @@ class Voxen(gl.Contract):
 
     def _results_hidden(self, proposal):
         return (proposal["result_visibility"] == "HIDDEN_UNTIL_CLOSE"
-                and proposal["status"] != "FINALIZED"
-                and self._transaction_time() < proposal["end_time"])
+                and proposal["status"] != "FINALIZED")
 
     def _vote_key(self, proposal_id, wallet):
         return proposal_id + ":" + wallet
@@ -430,10 +517,10 @@ class Voxen(gl.Contract):
             raise gl.vm.UserError("Outside voting window")
         if type(option_index) is not int or not 0 <= option_index < len(proposal["options"]):
             raise gl.vm.UserError("Invalid option index")
-        voter = self._evm_address(self._sender())
-        verification = self._check_eligibility_internal(proposal_id, voter)
-        if verification["eligible"] is not True:
-            raise gl.vm.UserError("Eligibility not verified")
+        # Sender normalization and eligibility verification intentionally precede every
+        # vote/tally read-modify-write operation.
+        voter = self._evm_address(str(gl.message.sender_address))
+        self._verify_eligibility_consensus(proposal_id, voter)
         key = self._vote_key(proposal_id, voter)
         raw = self.votes.get(key)
         counts = self._tallies(proposal)
@@ -457,8 +544,11 @@ class Voxen(gl.Contract):
         proposal = self._proposal(proposal_id)
         counts = self._tallies(proposal)
         hidden = self._results_hidden(proposal)
-        return {"hidden": hidden, "counts": None if hidden else counts,
-                "total_votes": sum(counts)}
+        return {
+            "hidden": hidden,
+            "counts": None if hidden else counts,
+            "total_votes": sum(counts),
+        }
 
     @gl.public.view
     def get_proposal_result(self, proposal_id: str) -> dict | None:
@@ -589,7 +679,7 @@ class Voxen(gl.Contract):
                       rules_revision=space["rules_revision"], created_at=timestamp)
         self.reviews[review_id] = json.dumps(record, sort_keys=True)
         self.latest_reviews[proposal_id] = review_id
-        self.review_count = u256(number)
+        self.review_count = gl.u256(number)
         return review_id
 
     def _authorize_review_open(self, proposal):

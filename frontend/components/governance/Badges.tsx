@@ -34,9 +34,13 @@ export function EligibilityBadge({
       ) : (
         <Fingerprint size={13} />
       )}{" "}
-      {eligibility.mode !== "POAP_NFT"
+      {eligibility.mode === "PUBLIC"
+        ? "Public voting"
+        : eligibility.mode === "GEN"
         ? `${eligibility.minimum} GEN holding`
-        : `${eligibility.standard} credential`}
+        : eligibility.mode === "POAP_EVENT"
+          ? `POAP event ${eligibility.eventId}`
+          : `${eligibility.standard} credential`}
     </span>
   );
 }

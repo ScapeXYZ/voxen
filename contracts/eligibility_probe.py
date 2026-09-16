@@ -1,6 +1,7 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 """V0.5.2.1 experimental transport probe, never an authorization source for Voxen."""
 import json
+import datetime
 import _genlayer_wasi as wasi
 from genlayer import *
 from genlayer.py.evm.calldata import MethodEncoder
@@ -106,7 +107,7 @@ class EligibilityProbe(gl.Contract):
                 "contract_address": gl.message.contract_address.as_hex,
                 # Retained context alias: runtime metadata, NOT eth_chainId.
                 "chain_id": int(gl.message.chain_id),
-                "message_raw": dict(gl.message_raw)}
+                "runtime_datetime": datetime.datetime.now(datetime.timezone.utc).isoformat()}
 
     @gl.public.view
     def native_candidate(self, threshold_wei: int) -> dict:
@@ -123,9 +124,8 @@ class EligibilityProbe(gl.Contract):
     def record_native_candidate(self, threshold_wei: int) -> None:
         """Persist caller balance evidence only; never authorize or transfer funds."""
         record = self.native_candidate(threshold_wei)
-        # Host-supplied transaction metadata only, never wall clock or freshness proof.
-        runtime_datetime = gl.message_raw.get("datetime")
-        record["runtime_datetime"] = runtime_datetime if type(runtime_datetime) is str else None
+        # GenVM's deterministic transaction clock is metadata, never freshness proof.
+        record["runtime_datetime"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         # Finish validation, balance read, metadata and serialization before mutation.
         encoded = json.dumps(record, sort_keys=True)
         self.last_native_candidate_json = encoded

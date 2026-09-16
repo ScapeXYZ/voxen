@@ -31,7 +31,7 @@ export function LiveExplore() {
       return body as { proposals: Proposal[]; nextOffset: number | null; total: number };
     },
     getNextPageParam: (page) => page.nextOffset ?? undefined,
-    retry: false, refetchInterval: 15000,
+    retry: false, refetchOnWindowFocus: false, refetchOnReconnect: false,
   });
   const proposals = [...new Map((query.data?.pages.flatMap((page) => page.proposals) ?? []).map((p) => [p.id, p])).values()];
   const stateFor = (proposal: Proposal) => votingState(proposal, now) as StatusId;
@@ -69,12 +69,12 @@ export function LiveExplore() {
     <div className="status-detail" id="status-results" role="tabpanel" aria-labelledby={`status-tab-${filter}`} tabIndex={-1}>
       <div className="status-detail-heading"><div><span className="eyebrow">Selected status</span><h2>{selected.label} proposals</h2></div><p>{selected.preview}</p></div>
       {query.isPending && <p role="status">Discovering live proposals…</p>}
-      {query.isError ? <p role="alert">{query.error.message}</p> : <div className="proposal-grid">{visible.map((proposal) => <ProposalCard key={proposal.id} proposal={proposal} />)}</div>}
+      {query.isError ? <div role="alert"><p>{query.error.message}</p><button className="button" onClick={() => void query.refetch()}>Retry</button></div> : <div className="proposal-grid">{visible.map((proposal) => <ProposalCard key={proposal.id} proposal={proposal} />)}</div>}
       {query.isSuccess && !visible.length && <div className="status-empty"><strong>No {selected.label.toLowerCase()} proposals right now.</strong><p>{filter === "LIVE" ? "Check Upcoming for proposals scheduled to begin later." : "Try another status or refresh the live proposal list."}</p></div>}
-      <div className="status-explorer-actions">
+      {!query.isError && <div className="status-explorer-actions">
         {query.hasNextPage && <button className="button" disabled={query.isFetching} onClick={() => void query.fetchNextPage()}>Load more proposals</button>}
         <button className="button" disabled={query.isFetching} onClick={() => void query.refetch()}>Refresh proposals</button>
-      </div>
+      </div>}
     </div>
   </section>;
 }

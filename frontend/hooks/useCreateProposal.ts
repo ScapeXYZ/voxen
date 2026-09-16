@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useSyncExternalStore } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useWallet } from "@/lib/genlayer/WalletProvider";
 import { voxenConfig } from "@/lib/voxen/config";
 import { createProposal } from "@/lib/voxen/writes";
@@ -63,38 +62,6 @@ export function useCreateProposal() {
       /* No resumable transaction. */
     }
   }, [key]);
-  const hash = state.txId || state.evmHash;
-  const kind = state.txId ? "genlayer" : "evm";
-  const status = useQuery({
-    queryKey: ["voxen-transaction", key, hash, kind],
-    queryFn: async () => {
-      const response = await fetch(
-        `/api/voxen/transactions/${hash}?kind=${kind}`,
-        { cache: "no-store", signal: AbortSignal.timeout(25_000) },
-      );
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.technical || body.message);
-      return body as { stage: VoteStage; txId?: string; technical?: string };
-    },
-    enabled: !!hash && state.stage !== "finalized" && state.stage !== "failed",
-    retry: false,
-    refetchInterval:
-      state.stage === "finalized" || state.stage === "failed" ? false : 4000,
-    refetchOnWindowFocus: true,
-  });
-  useEffect(() => {
-    if (!status.data) return;
-    const previous = states.get(key) || idle;
-    const next = status.data;
-    save(key, {
-      ...previous,
-      ...next,
-      message:
-        next.stage === "failed"
-          ? "The proposal could not be created. Review the details and try again."
-          : undefined,
-    });
-  }, [status.data, key]);
   const pending = [
     "preparing",
     "submitting",
@@ -147,8 +114,8 @@ export function useCreateProposal() {
       if (["accepted", "finalized"].includes(state.stage) && !running.has(key))
         save(key, idle);
     },
-    monitoringError: status.error?.message,
-    retryStatus: status.refetch,
+    monitoringError: undefined,
+    retryStatus: async () => undefined,
   };
 }
 export type CreateController = ReturnType<typeof useCreateProposal>;

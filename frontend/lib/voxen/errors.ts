@@ -1,4 +1,5 @@
 import { abi } from "genlayer-js";
+import { voxenConfig } from "./config";
 export function voteError(error: unknown) {
   const technical =
     error instanceof Error
@@ -36,7 +37,7 @@ export function voteError(error: unknown) {
     ],
     [
       /Vote is final|already been recorded/i,
-      "Your vote has already been recorded and cannot be changed.",
+      "This wallet has already voted. Your vote is final.",
     ],
     [
       /Same option is a no-op/i,
@@ -54,7 +55,7 @@ export function voteError(error: unknown) {
       /wallet changed|account changed/i,
       "Your connected wallet changed. Check your account and try again.",
     ],
-    [/network|chain mismatch/i, "Switch to GenLayer Bradbury to vote."],
+    [/network|chain mismatch/i, `Switch to ${voxenConfig.networkName} to vote.`],
   ];
   return {
     message:

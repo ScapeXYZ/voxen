@@ -1,17 +1,20 @@
 import { formatUnits } from "viem";
 import type { Eligibility, Proposal } from "@/types/voxen";
 import { readVoxen } from "./client";
+import { createDiscoveryService } from "./discovery";
 
 function record(value: unknown): Record<string, unknown> { if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid contract response"); return value as Record<string, unknown>; }
 function str(value: unknown): string { if (typeof value !== "string") throw new Error("Expected contract text"); return value; }
 function integer(value: unknown): number { const n = typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value; if (typeof n !== "number" || !Number.isSafeInteger(n) || n < 0) throw new Error("Invalid contract integer"); return n; }
 function bool(value: unknown): boolean { if (typeof value !== "boolean") throw new Error("Invalid contract boolean"); return value; }
-function enumeration<T extends string>(value: unknown, values: readonly T[]): T { if (!values.includes(value as T)) throw new Error("Unsupported contract value"); return value as T; }
+function enumeration<T extends string>(value: unknown, values: readonly T[]): T { if (!values.includes(value as T)) throw new Error(`Unsupported contract value: ${String(value)}`); return value as T; }
 function decimal(value: unknown): string { const s = str(value); if (!/^\d+$/.test(s)) throw new Error("Invalid decimal"); return s; }
 
 export async function getProposalEligibility(id: string): Promise<Eligibility> {
   const e = record(await readVoxen("get_proposal_eligibility", [id]));
+  if (e.mode === "PUBLIC") return { mode: "PUBLIC" };
   if (e.mode === "GEN") return { mode: "GEN", minimum: formatUnits(BigInt(decimal(e.minimum_gen_balance)), 18) };
+  if (e.mode === "POAP_EVENT") return { mode: "POAP_EVENT", eventId: decimal(e.poap_event_id) };
   return { mode: enumeration(e.mode, ["POAP_NFT"]), contract: str(e.credential_contract_address), standard: enumeration(e.credential_type, ["ERC721", "ERC1155"]), tokenId: e.credential_token_id === null ? undefined : decimal(e.credential_token_id) };
 }
 export async function getSpace(id: string) {
@@ -34,4 +37,6 @@ export async function getLatestGovernanceReview(id: string) { const raw = await 
 export async function checkEligibility(id: string, wallet: string) { return record(await readVoxen("check_eligibility", [id, wallet])); }
 export async function loadVoxenProposal(id: string) { const [base, tallies, result, review] = await Promise.all([getProposal(id), getProposalTallies(id), getProposalResult(id), getLatestGovernanceReview(id)]); const proposal = { ...base, participation: tallies.total, talliesHidden: tallies.hidden, options: base.options.map((o, i) => ({ ...o, votes: tallies.counts?.[i] ?? 0 })), result: result?.status === "TIED" ? "TIED" : result?.winningOption ?? undefined }; return { proposal, result, review, fetchedAt: new Date().toISOString() }; }
 export type LiveProposal = Awaited<ReturnType<typeof loadVoxenProposal>>;
-export async function discoverProposals(offset = 0) { const page = record(await readVoxen("get_proposal_ids", [offset, 20])); const ids = (page.ids as unknown[]).map(str); const proposals = await Promise.all(ids.map((id) => loadVoxenProposal(id).then((item) => item.proposal))); return { proposals, total: integer(page.total), nextOffset: page.next_offset === null ? null : integer(page.next_offset) }; }
+async function readProposalDiscovery(offset: number, limit: number) { const page = record(await readVoxen("get_proposal_ids", [offset, limit])); const ids = (page.ids as unknown[]).map(str); const proposals = await Promise.all(ids.map((id) => loadVoxenProposal(id).then((item) => item.proposal))); return { proposals, total: integer(page.total), nextOffset: page.next_offset === null ? null : integer(page.next_offset) }; }
+const discover = createDiscoveryService(readProposalDiscovery);
+export async function discoverProposals(offset = 0, limit = 20) { return discover(offset, limit); }

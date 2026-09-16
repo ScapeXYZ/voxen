@@ -1,7 +1,5 @@
-import { credentialFields } from "./credentials/provider";
-import { credentialCatalog } from "./credentials/catalog";
-import { isAddress, parseUnits } from "viem";
 import type { CalldataEncodable } from "genlayer-js/types";
+import { voxenConfig } from "./config";
 export const emptyProposalForm = {
   title: "",
   description: "",
@@ -10,15 +8,10 @@ export const emptyProposalForm = {
   end: "",
   policy: "FINAL_ON_CAST",
   visibility: "LIVE",
-  mode: "GEN",
-  minimum: "",
-  contract: "",
-  // Display-only metadata; never submitted to the reduced contract API.
+  mode: "PUBLIC",
+  poapEventId: "",
   label: "",
-  chain: "4221",
-  standard: "ERC1155",
-  token: "",
-  credentialMetadata: "",
+  poapMetadata: "",
   guard: false,
   evidence: "",
 };
@@ -62,46 +55,10 @@ export function validateProposalForm(
       return "Choose a valid result visibility and vote change policy.";
   }
   if (step === 3) {
-    if (!["GEN", "POAP_NFT"].includes(form.mode))
+    if (!["PUBLIC", "POAP_EVENT"].includes(form.mode))
       return "Choose one eligibility mode.";
-    if (form.mode === "GEN") {
-      if (!/^\d+(\.\d{1,18})?$/.test(form.minimum))
-        return "Enter a positive minimum GEN balance, up to 18 decimal places.";
-      const wei = parseUnits(form.minimum, 18);
-      if (wei <= 0n || wei >= 2n ** 256n)
-        return "Enter a positive GEN balance within the supported range.";
-    } else {
-      if (form.credentialMetadata) {
-        try {
-          const canonical = credentialFields(
-            JSON.parse(form.credentialMetadata),
-          );
-          if (
-            Object.entries(canonical).some(
-              ([key, value]) => form[key as keyof ProposalForm] !== value,
-            )
-          )
-            return "Credential metadata changed. Select the credential again.";
-        } catch (error) {
-          return error instanceof Error
-            ? error.message
-            : "Invalid credential metadata.";
-        }
-      }
-      if (
-        !isAddress(form.contract) ||
-        /^0x0{40}$/i.test(form.contract) ||
-        !["ERC721", "ERC1155"].includes(form.standard)
-      )
-        return "Check the credential contract and token settings.";
-      if (form.standard === "ERC721" && form.token)
-        return "ERC721 collection eligibility does not accept a token ID.";
-      if (
-        form.standard === "ERC1155" &&
-        (!/^\d+$/.test(form.token) || BigInt(form.token) >= 2n ** 256n)
-      )
-        return "Enter the numeric ERC1155 token ID supplied by the credential collection owner.";
-    }
+    if (form.mode === "POAP_EVENT" && (!/^\d+$/.test(form.poapEventId) || BigInt(form.poapEventId) >= 2n ** 256n))
+      return "Select a Portal POAP with public legacy verification.";
   }
   if (step === 0) {
     if (form.guard && (!form.space || live))
@@ -117,7 +74,7 @@ export function validateProposalForm(
   }
   return "";
 }
-/** Exact positional order from contracts/voxen.py. UI GEN_HOLDING maps to contract GEN. */
+/** Exact positional ABI order from contracts/voxen.py#create_proposal. */
 export function createProposalArgs(
   form: ProposalForm,
   options: string[],
@@ -126,23 +83,19 @@ export function createProposalArgs(
     const error = validateProposalForm(form, options, step, true);
     if (error) throw new Error(error);
   }
-  const gen = form.mode === "GEN";
   return [
     form.title,
     form.description,
     options,
     Math.floor(Date.parse(form.start) / 1000),
     Math.floor(Date.parse(form.end) / 1000),
-    gen ? "GEN" : "POAP_NFT",
+    form.mode,
     null,
     form.evidence.trim() || null,
     false,
     form.visibility,
     form.policy,
-    gen ? parseUnits(form.minimum, 18) : null,
-    gen ? null : form.contract,
-    gen ? null : form.standard,
-    !gen && form.standard === "ERC1155" ? BigInt(form.token) : null,
+    form.mode === "POAP_EVENT" ? BigInt(form.poapEventId) : null,
   ];
 }
 export function creationError(error: unknown) {
@@ -161,7 +114,7 @@ export function creationError(error: unknown) {
     message =
       "Your connected wallet changed. Check your account and try again.";
   else if (/network/i.test(technical))
-    message = "Switch to GenLayer Bradbury to create this proposal.";
+    message = `Switch to ${voxenConfig.networkName} to create this proposal.`;
   return { message, technical };
 }
 export function smokeTestForm(): ProposalForm {
@@ -175,10 +128,12 @@ export function smokeTestForm(): ProposalForm {
     ...emptyProposalForm,
     title: "Voxen Frontend Live Vote Test",
     description:
-      "Live Bradbury proposal created from the Voxen frontend to verify proposal creation and voting.",
+      `Live ${voxenConfig.networkName} proposal created from the Voxen frontend to verify proposal creation and voting.`,
     start: local(Date.now() - 60_000),
     end: local(Date.now() + 4 * 3600_000),
-    mode: "POAP_NFT",
-    ...credentialFields(credentialCatalog[0]),
+    mode: "POAP_EVENT",
+    poapEventId: "226692",
+    label: "GenLayer X AMA Participation #52",
+    poapMetadata: "genlayer-x-ama-participation-52-226692",
   };
 }

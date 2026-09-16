@@ -52,18 +52,18 @@ def test_compact_artifact_has_required_directive_and_valid_python():
     compile(artifact, str(ARTIFACT), "exec")
 
 
-def test_compact_gen_balance_uses_the_native_eth_contract_proxy():
+def test_compact_artifact_uses_deterministic_datetime_and_has_no_message_raw():
     build()
     artifact = ARTIFACT.read_text()
-    assert "_genlayer_wasi" not in artifact
-    assert "wasi.get_balance" not in artifact
-    assert "EthContract" in artifact
-    tree = ast.parse(artifact)
-    native_balance = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
-                          and any(isinstance(child, ast.Attribute) and child.attr == "balance"
-                                  for child in ast.walk(node)))
-    assert any(isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-               and node.func.id == "EthContract" for node in ast.walk(native_balance))
+    assert "gl.message_raw" not in artifact
+    assert "datetime.datetime.now(datetime.timezone.utc).timestamp()" in artifact
+
+
+def test_compact_artifact_uses_batched_poap_json_rpc():
+    build()
+    artifact = ARTIFACT.read_text()
+    assert "nondet.web.post" in artifact
+    assert "0x2f745c59" in artifact and "0x127a5298" in artifact
 
 
 def test_compact_artifact_preserves_the_public_contract_surface():
@@ -78,8 +78,8 @@ def test_all_public_signatures_and_decorators_are_identical():
     build()
     source_methods = _public_methods(_tree(SOURCE))
     artifact_methods = _public_methods(_tree(ARTIFACT))
-    # The intentionally slim deployment ABI has 15 retained public methods.
-    assert len(source_methods) == len(artifact_methods) == 15
+    # The intentionally slim deployment ABI has 16 retained public methods.
+    assert len(source_methods) == len(artifact_methods) == 16
     assert [node.name for node in source_methods] == [node.name for node in artifact_methods]
     for source, artifact in zip(source_methods, artifact_methods):
         assert ast.dump(source.args, include_attributes=False) == ast.dump(artifact.args, include_attributes=False)
@@ -141,50 +141,18 @@ def test_compact_public_lifecycle_matches_canonical_behavior(direct_vm, direct_d
     space_id = contract.create_space("Equivalence community", governance_rules="Be fair")
     proposal_id = contract.create_proposal(
         "Choose", "Equivalent lifecycle", ["A", "B"], 1, 2,
-        "GEN", space_id, minimum_gen_balance=1)
+        "POAP_EVENT", space_id, poap_event_id=7)
     assert contract.get_space(space_id)["id"] == space_id
+    assert contract.get_space_ids() == {"ids": [space_id], "total": 1, "next_offset": None}
     assert contract.get_proposal(proposal_id)["status"] == "PUBLISHED"
     assert contract.get_proposal_ids() == {"ids": [proposal_id], "total": 1, "next_offset": None}
 
 
-def test_compact_gen_eligibility_does_not_shadow_native_balance_helper(direct_vm, direct_deploy, monkeypatch):
-    """Exercise generated code: this used to emit `a = a(Address(...))`."""
-    wallet = create_address("compact-gen-eligible")
-    balances = {wallet: 5}
-    monkeypatch.setattr("_genlayer_wasi.get_balance", lambda raw: balances.get(raw, 0))
-    direct_vm.sender = wallet
-    direct_vm.warp("1970-01-01T00:00:01Z")
-    compact = direct_deploy(str(ARTIFACT))
-    proposal_id = compact.create_proposal(
-        "GEN threshold", "Generated compact artifact", ["A", "B"], 1, 2,
-        "GEN", vote_change_policy="CHANGE_UNTIL_CLOSE", minimum_gen_balance=5)
-
-    assert compact.check_eligibility(proposal_id, "0x" + wallet.hex())["eligible"] is True
-    compact.cast_vote(proposal_id, 0)
-    balances[wallet] = 4
-    assert compact.check_eligibility(proposal_id, "0x" + wallet.hex())["eligible"] is False
-    from genlayer import gl
-    with pytest.raises((ValueError, gl.vm.UserError)):
-        compact.cast_vote(proposal_id, 1)
-    assert compact.get_proposal_tallies(proposal_id)["counts"] == [1, 0]
-
-
-def test_compact_erc721_and_erc1155_eligibility_remain_verified(direct_vm, direct_deploy, monkeypatch):
+def test_compact_artifact_retains_poap_consensus_and_removes_legacy_eligibility():
     build()
-    wallet = create_address("compact-credential-holder")
-    direct_vm.sender = wallet
-    compact = direct_deploy(str(ARTIFACT))
-    import genlayer.gl._internal.gl_call as calls
-    from genlayer.py.types import Lazy
-    monkeypatch.setattr(calls, "gl_call_generic",
-                        lambda _, decode: Lazy(lambda: decode((1).to_bytes(32, "big"))))
-    collection = "0x0000000000000000000000000000000000000001"
-    for kind, token in (("ERC721", None), ("ERC1155", 7)):
-        proposal_id = compact.create_proposal(
-            kind, "Generated compact artifact", ["A", "B"], 1, 2, "POAP_NFT",
-            minimum_gen_balance=None, credential_contract_address=collection,
-            credential_type=kind, credential_token_id=token)
-        assert compact.check_eligibility(proposal_id, "0x" + wallet.hex())["eligible"] is True
+    artifact = ARTIFACT.read_text()
+    assert "PUBLIC" in artifact and "POAP_EVENT" in artifact and "POAP_SCAN_LIMIT_EXCEEDED" in artifact
+    assert "POAP_NFT" not in artifact and '"GEN"' not in artifact
 
 
 def test_compact_artifact_has_no_self_shadowing_call_from_renaming():

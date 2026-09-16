@@ -1,155 +1,108 @@
 "use client";
-import { createClient } from "genlayer-js";
+
+import type { SubmitInput, TrackedStatus } from "@genlayer/transaction-kit";
 import type { CalldataEncodable } from "genlayer-js/types";
-import { createProposalArgs, type ProposalForm } from "./create-proposal";
-import { studioDevnet } from "genlayer-js/chains";
+import { createVoxenTransactionKit } from "@/lib/genlayer/kit";
 import { getEthereumProvider } from "@/lib/genlayer/client";
+import { createProposalArgs, type ProposalForm } from "./create-proposal";
 import { voxenConfig } from "./config";
+import { fetchEligibility } from "./eligibility-client";
 import type { LiveProposal } from "./reads";
 import type { VoteStage } from "./transaction-state";
-import { fetchEligibility } from "./eligibility-client";
 
-export async function submitVote(
-  id: string,
+type WriteUpdate = (state: { stage: VoteStage; evmHash?: string; txId?: string }) => void;
+type VoxenMethod = "cast_vote" | "create_proposal" | "transition_proposal" | "request_governance_review";
+
+async function assertActiveWallet(wallet: string) {
+  const provider = getEthereumProvider();
+  if (!provider) throw new Error("Connect your wallet first");
+  if (localStorage.getItem("wallet_disconnected") === "true")
+    throw new Error("Connected wallet changed");
+  const accounts = (await provider.request({ method: "eth_accounts" })) as string[];
+  if (accounts[0]?.toLowerCase() !== wallet.toLowerCase())
+    throw new Error("Connected wallet changed");
+  const chain = await provider.request({ method: "eth_chainId" });
+  if (Number(chain) !== voxenConfig.chainId) throw new Error("Unsupported network");
+}
+
+function trackedStage(status: TrackedStatus): VoteStage {
+  if (status.phase === "submitted" || status.phase === "pending") return "submitted";
+  if (status.phase === "processing") return "processing";
+  if (status.phase === "decided") {
+    // ACCEPTED is a consensus checkpoint, not proof that this write has
+    // executed successfully. Keep waiting for FINALIZED.
+    if (status.successful === true) return "processing";
+    if (status.successful === false) return "failed";
+    return "processing";
+  }
+  if (status.successful === true) return "finalized";
+  if (status.successful === false) return "failed";
+  return "processing";
+}
+
+async function submitContractWrite(
   wallet: string,
-  optionIndex: number,
-  update: (state: {
-    stage: VoteStage;
-    evmHash?: string;
-    txId?: string;
-  }) => void,
+  method: VoxenMethod,
+  args: CalldataEncodable[],
+  update: WriteUpdate,
+  beforeSign: () => void | Promise<void>,
 ) {
+  await assertActiveWallet(wallet);
+  await beforeSign();
+  const kit = createVoxenTransactionKit(wallet);
+  const tx: SubmitInput = {
+    kind: "write",
+    address: voxenConfig.contract as `0x${string}`,
+    method,
+    args,
+  };
+  const quote = await kit.estimate({ preset: "standard" }, tx);
+  // Estimating may take time; verify the exact account and chain once more
+  // before Transaction Kit opens the wallet confirmation request.
+  await assertActiveWallet(wallet);
+  await beforeSign();
+  update({ stage: "submitting" });
+  const submitted = await kit.submit(quote, tx);
+  update({
+    stage: "submitted",
+    txId: submitted.genlayerTxId,
+    evmHash: submitted.evmTxHash,
+  });
+  await kit.track(
+    submitted.genlayerTxId,
+    (status) => update({
+      stage: trackedStage(status),
+      txId: status.genlayerTxId,
+      evmHash: status.evmTxHash ?? submitted.evmTxHash,
+    }),
+    { until: "finalized" },
+  );
+}
+
+export async function submitVote(id: string, wallet: string, optionIndex: number, update: WriteUpdate) {
   const read = async <T>(suffix: string): Promise<T> => {
     const response = await fetch(
       `/api/voxen/proposals/${encodeURIComponent(id)}${suffix}`,
       { cache: "no-store", signal: AbortSignal.timeout(25_000) },
     );
-    if (!response.ok)
-      throw new Error("Could not refresh proposal before voting");
+    if (!response.ok) throw new Error("Could not refresh proposal before voting");
     return response.json();
   };
-  const [live, eligibility] = await Promise.all([
-    read<LiveProposal>(""),
-    fetchEligibility(id, wallet),
-  ]);
-  const p = live.proposal;
+  const [live, eligibility] = await Promise.all([read<LiveProposal>(""), fetchEligibility(id, wallet)]);
+  const proposal = live.proposal;
   const assertWindow = () => {
     const now = Date.now() / 1000;
-    if (p.status !== "PUBLISHED" || now < Date.parse(p.startsAt) / 1000 || now >= Date.parse(p.endsAt) / 1000)
+    if (proposal.status !== "PUBLISHED" || now < Date.parse(proposal.startsAt) / 1000 || now >= Date.parse(proposal.endsAt) / 1000)
       throw new Error("Outside voting window");
   };
   assertWindow();
-  if (
-    !Number.isInteger(optionIndex) ||
-    optionIndex < 0 ||
-    optionIndex >= p.options.length
-  )
+  if (!Number.isInteger(optionIndex) || optionIndex < 0 || optionIndex >= proposal.options.length)
     throw new Error("Invalid option index");
   if (!eligibility.eligible) throw new Error("Eligibility not verified");
-  await submitContractWrite(
-    wallet,
-    "cast_vote",
-    [id, optionIndex],
-    update,
-    assertWindow,
-  );
+  await submitContractWrite(wallet, "cast_vote", [id, optionIndex], update, assertWindow);
 }
 
-type WriteUpdate = (state: {
-  stage: VoteStage;
-  evmHash?: string;
-  txId?: string;
-}) => void;
-async function submitContractWrite(
-  wallet: string,
-  functionName: "cast_vote" | "create_proposal" | "transition_proposal" | "request_governance_review",
-  args: CalldataEncodable[],
-  update: WriteUpdate,
-  beforeSend: () => void,
-) {
-  const provider = getEthereumProvider();
-  if (!provider) throw new Error("Connect your wallet first");
-  const assertWallet = async () => {
-    if (localStorage.getItem("wallet_disconnected") === "true")
-      throw new Error("Connected wallet changed");
-    const accounts = (await provider.request({
-      method: "eth_accounts",
-    })) as string[];
-    if (accounts[0]?.toLowerCase() !== wallet.toLowerCase())
-      throw new Error("Connected wallet changed");
-    const chain = await provider.request({ method: "eth_chainId" });
-    if (Number(chain) !== voxenConfig.chainId)
-      throw new Error("Unsupported network");
-  };
-  await assertWallet();
-  let sent = false;
-  const client = createClient({
-    account: {
-      address: wallet as `0x${string}`,
-      type: "json-rpc",
-    },
-    chain: {
-      ...studioDevnet,
-      rpcUrls: { default: { http: [voxenConfig.rpc] } },
-    },
-    provider: {
-      request: async ({
-        method,
-        params,
-      }: {
-        method: string;
-        params?: unknown[];
-      }) => {
-        if (method !== "eth_sendTransaction")
-          return provider.request({ method, params: params as unknown[] });
-        if (sent)
-          throw new Error("Transaction already submitted; do not resubmit");
-        await assertWallet();
-        beforeSend();
-        update({ stage: "submitting" });
-        const hash = await provider.request({
-          method,
-          params: params as unknown[],
-        });
-        sent = true;
-        if (typeof hash !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(hash))
-          throw new Error("Wallet returned an invalid transaction hash");
-        update({ stage: "submitted", evmHash: hash });
-        return hash;
-      },
-    },
-  });
-  // No approval, transfer, label, or eligibility verdict is passed to the contract.
-  // The contract checks the actual sender, current time, and current holding.
-  const write = {
-    address: voxenConfig.contract as `0x${string}`,
-    functionName,
-    args,
-    value: 0n,
-  };
-  const fees = await client.estimateTransactionFeesForWrite({
-    account: { address: wallet as `0x${string}`, type: "json-rpc" },
-    ...write,
-  });
-  const txId = await client.writeContract({
-    ...write,
-    fees: {
-      distribution: fees.distribution,
-      messageAllocations: fees.messageAllocations,
-      feeValue: fees.feeValue,
-    },
-  });
-  if (typeof txId !== "string" || !/^0x[0-9a-fA-F]{64}$/.test(txId))
-    throw new Error("SDK returned an invalid transaction ID");
-  update({ stage: "processing", txId });
-}
-
-export async function createProposal(
-  form: ProposalForm,
-  options: string[],
-  wallet: string,
-  update: WriteUpdate,
-) {
+export async function createProposal(form: ProposalForm, options: string[], wallet: string, update: WriteUpdate) {
   const args = createProposalArgs(form, options);
   await submitContractWrite(wallet, "create_proposal", args, update, () => {
     createProposalArgs(form, options);
@@ -157,8 +110,38 @@ export async function createProposal(
 }
 
 export async function transitionProposal(id: string, status: "PUBLISHED" | "FINALIZED", wallet: string, update: WriteUpdate) {
-  await submitContractWrite(wallet, "transition_proposal", [id, status], update, () => undefined);
+  const assertTransition = async () => {
+    const response = await fetch(`/api/voxen/proposals/${encodeURIComponent(id)}`, {
+      cache: "no-store", signal: AbortSignal.timeout(25_000),
+    });
+    if (!response.ok) throw new Error("Could not refresh proposal before changing its state");
+    const { proposal, review } = await response.json() as {
+      proposal: LiveProposal["proposal"];
+      review: { classification: string } | null;
+    };
+    if (status === "PUBLISHED") {
+      if (proposal.status !== "REVIEW") throw new Error("Proposal is not ready to publish");
+      if (proposal.guardRequired && review?.classification !== "COMPLIANT")
+        throw new Error("A compliant governance review is required before publication");
+      return;
+    }
+    if (proposal.status !== "PUBLISHED" || Date.now() < Date.parse(proposal.endsAt))
+      throw new Error("Proposal cannot be finalized before its voting window closes");
+  };
+  await assertTransition();
+  await submitContractWrite(wallet, "transition_proposal", [id, status], update, assertTransition);
 }
+
 export async function requestGovernanceReview(id: string, wallet: string, update: WriteUpdate) {
-  await submitContractWrite(wallet, "request_governance_review", [id], update, () => undefined);
+  const assertReviewable = async () => {
+    const response = await fetch(`/api/voxen/proposals/${encodeURIComponent(id)}`, {
+      cache: "no-store", signal: AbortSignal.timeout(25_000),
+    });
+    if (!response.ok) throw new Error("Could not refresh proposal before requesting review");
+    const { proposal } = await response.json() as { proposal: LiveProposal["proposal"] };
+    if (proposal.status !== "REVIEW" || !proposal.guardRequired)
+      throw new Error("This proposal is not awaiting governance review");
+  };
+  await assertReviewable();
+  await submitContractWrite(wallet, "request_governance_review", [id], update, assertReviewable);
 }

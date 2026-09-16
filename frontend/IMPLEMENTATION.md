@@ -1,7 +1,7 @@
 # Voxen frontend
 
-The frontend reads and writes the deployed Voxen contract on GenLayer Bradbury
-testnet. It never falls back to sample proposals, communities, results, or
+The frontend reads and writes the deployed Voxen contract on the configured
+GenLayer network. It never falls back to sample proposals, communities, results, or
 transaction status.
 
 ## Product routes
@@ -13,7 +13,7 @@ transaction status.
 - `/create` is a five-step onchain proposal flow with two to six choices.
 - `/communities` explains the deployed contract’s current limitation: it can
   read a known Community ID but has no public Community-directory API.
-- `/live-proof` describes the verified Bradbury deployment and contract checks.
+- `/live-proof` describes the configured deployment and contract checks.
 
 ## Contract boundary
 

@@ -1,9 +1,10 @@
 export type ProposalStatus =
   "PUBLISHED" | "REVIEW" | "FINALIZED";
-export type EligibilityMode = "GEN" | "POAP_NFT";
+export type EligibilityMode = "PUBLIC" | "GEN" | "POAP_NFT" | "POAP_EVENT";
 export type VoteChangePolicy = "FINAL_ON_CAST" | "CHANGE_UNTIL_CLOSE";
 export type ResultVisibility = "LIVE" | "HIDDEN_UNTIL_CLOSE";
 export type Eligibility =
+  | { mode: "PUBLIC" }
   | { mode: "GEN"; minimum: string; chainId?: number }
   | {
       mode: "POAP_NFT";
@@ -12,7 +13,8 @@ export type Eligibility =
       label?: string;
       standard: "ERC721" | "ERC1155";
       tokenId?: string;
-    };
+    }
+  | { mode: "POAP_EVENT"; eventId: string };
 export interface GovernanceGuardReview {
   outcome: "COMPLIANT" | "NEEDS_REVIEW" | "NON_COMPLIANT";
   risk: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";

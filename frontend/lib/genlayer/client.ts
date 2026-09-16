@@ -1,15 +1,24 @@
 "use client";
 
 import { voxenConfig } from "@/lib/voxen/config";
+import { studioDevnet } from "genlayer-js/chains";
 
 export const GENLAYER_CHAIN_ID = voxenConfig.chainId;
 export const GENLAYER_CHAIN_ID_HEX = `0x${GENLAYER_CHAIN_ID.toString(16)}`;
 export const GENLAYER_NETWORK = {
   chainId: GENLAYER_CHAIN_ID_HEX,
-  chainName: "GenLayer EVM",
+  chainName: voxenConfig.networkName,
   nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 },
   rpcUrls: [voxenConfig.evmRpc],
 };
+// Studio Next shares Studio Devnet's consensus contract configuration in this
+// SDK release, while using Voxen's explicit RPC endpoint and chain id.
+export const GENLAYER_CHAIN = {
+  ...studioDevnet,
+  id: GENLAYER_CHAIN_ID,
+  name: voxenConfig.networkName,
+  rpcUrls: { default: { http: [voxenConfig.rpc] } },
+} satisfies typeof studioDevnet;
 
 // Ethereum provider type from window
 interface EthereumProvider {

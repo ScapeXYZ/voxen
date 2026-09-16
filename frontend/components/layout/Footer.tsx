@@ -1,5 +1,6 @@
 import { VoxenLogo } from "./VoxenLogo";
 import Link from "next/link";
+import { voxenConfig } from "@/lib/voxen/config";
 export function Footer() {
   return (
     <footer className="footer shell">
@@ -13,10 +14,9 @@ export function Footer() {
         <Link href="/live-proof">Live Proof ↗</Link>
         <span>Built on GenLayer</span>
         <details>
-          <summary>Bradbury Testnet</summary>
+          <summary>{voxenConfig.networkName}</summary>
           <p>
-            Testnet environment used to demonstrate Voxen before production
-            deployment.
+            Active network used to demonstrate Voxen before production deployment.
           </p>
         </details>
         <span>Independent project.</span>

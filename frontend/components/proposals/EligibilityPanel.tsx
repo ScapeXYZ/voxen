@@ -4,6 +4,8 @@ import { useWallet } from "@/lib/genlayer/WalletProvider";
 import { WalletButton } from "@/components/wallet/WalletButton";
 import type { EligibilityCheck } from "@/hooks/useVoxenEligibility";
 import type { Eligibility } from "@/types/voxen";
+import { voxenConfig } from "@/lib/voxen/config";
+import { eligibilityMessage } from "@/lib/voxen/eligibility-status";
 export function EligibilityPanel({
   eligibility: e,
   live = false,
@@ -18,16 +20,22 @@ export function EligibilityPanel({
   return (
     <section className="eligibility-panel">
       <Fingerprint size={22} />
-      <h3>{e.mode === "POAP_NFT" ? "Required credential" : "Who can vote?"}</h3>
+      <h3>{e.mode === "PUBLIC" || e.mode === "GEN" ? "Who can vote?" : "Required credential"}</h3>
       <p>
-        {e.mode !== "POAP_NFT"
+        {e.mode === "PUBLIC"
+          ? "Public voting — anyone with a connected wallet can vote."
+          : e.mode === "GEN"
           ? `To vote, your wallet must hold at least ${e.minimum} GEN.`
-          : e.standard === "ERC721"
+          : e.mode === "POAP_EVENT"
+            ? `To vote, your wallet must hold the credential for POAP event ${e.eventId}.`
+            : e.standard === "ERC721"
             ? "To vote, your wallet must hold a credential from this collection."
             : "To vote, your wallet must hold the required credential token."}
       </p>
       <p className="small muted">
-        {e.mode !== "POAP_NFT"
+        {e.mode === "PUBLIC"
+          ? "The contract still verifies voting time, lifecycle, and one vote per wallet."
+          : e.mode === "GEN"
           ? "GEN is not spent or locked. It is only used to verify eligibility."
           : "Your credential stays in your wallet; ownership is verified by the contract."}
       </p>
@@ -56,24 +64,21 @@ export function EligibilityPanel({
         {!wallet.isConnected
           ? "Connect your wallet to check whether you can vote."
           : !wallet.isOnCorrectNetwork
-            ? "Switch to GenLayer Bradbury to continue."
+            ? `Switch to ${voxenConfig.networkName} to continue.`
             : check?.isFetching
-              ? e.mode === "POAP_NFT"
+              ? e.mode === "POAP_EVENT" || e.mode === "POAP_NFT"
                 ? "Checking credential ownership..."
                 : "Checking your voting eligibility..."
               : failure
                 ? "We couldn't verify your voting eligibility. Try again."
-                : check?.data?.eligible === true
-                  ? "Eligible to vote"
-                  : check?.data?.eligible === false
-                    ? e.mode === "POAP_NFT"
-                      ? "This wallet does not hold the required credential."
-                      : "You're not eligible for this proposal."
+                : eligibilityMessage(check?.data?.eligible, check?.data?.status, e.mode === "POAP_EVENT" || e.mode === "POAP_NFT")
+                  ?? (check?.data?.eligible === false
+                    ? "You're not eligible for this proposal."
                     : live
-                      ? e.mode === "POAP_NFT"
+                      ? e.mode === "POAP_EVENT" || e.mode === "POAP_NFT"
                         ? "Checking credential ownership..."
                         : "Checking your voting eligibility..."
-                      : "Eligibility unavailable: live checks are not connected for this sample."}
+                      : "Eligibility unavailable: live checks are not connected for this sample.")}
       </p>
       {live && (
         <p className="small muted">
@@ -86,7 +91,7 @@ export function EligibilityPanel({
           <summary>Verification details</summary>
           <p className="small">
             Observed balance: {check.data.observed_balance}
-            {e.mode !== "POAP_NFT" ? " wei" : " tokens"}. Verification: {check.data.verification_status}.
+            {e.mode === "GEN" ? " wei" : " tokens"}. Verification: {check.data.verification_status}.
           </p>
         </details>
       )}

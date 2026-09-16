@@ -37,7 +37,9 @@ class _RemoveDocstrings(ast.NodeTransformer):
 def _short_names():
     for width in range(1, 4):
         for chars in itertools.product(string.ascii_lowercase, repeat=width):
-            yield "".join(chars)
+            candidate = "".join(chars)
+            if not keyword.iskeyword(candidate):
+                yield candidate
 
 
 def _is_public(node):

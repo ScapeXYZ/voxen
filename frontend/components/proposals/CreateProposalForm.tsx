@@ -12,6 +12,7 @@ import {
 import { voteStageLabels } from "@/lib/voxen/transaction-state";
 import { SupportingReference } from "./SupportingReference";
 import { CredentialPicker } from "./CredentialPicker";
+import { voxenConfig } from "@/lib/voxen/config";
 const steps = ["Proposal details", "Voting choices", "Voting period", "Who can vote?", "Review & publish"];
 export function CreateProposalForm() {
   const wallet = useWallet();
@@ -44,7 +45,7 @@ export function CreateProposalForm() {
       return;
     }
     if (!wallet.isOnCorrectNetwork) {
-      setError("Switch to GenLayer Bradbury to create this proposal.");
+      setError(`Switch to ${voxenConfig.networkName} to create this proposal.`);
       return;
     }
     if (creation.pending || created) return;
@@ -117,7 +118,7 @@ export function CreateProposalForm() {
         {step === 0 && (
           <>
             <p>
-              Create a publicly accessible proposal on Bradbury. A Community workspace is not required. You may prepare a proposal on behalf of another entity; the connected wallet remains the onchain creator.
+              Create a publicly accessible proposal on {voxenConfig.networkName}. A Community workspace is not required. You may prepare a proposal on behalf of another entity; the connected wallet remains the onchain creator.
             </p>
             <label>
               Proposal title
@@ -249,60 +250,19 @@ export function CreateProposalForm() {
         {step === 3 && (
           <>
             <p>
-              Choose who can vote. GEN holding requires a minimum balance; NFT /
-              POAP requires a specific community credential.
+              Choose who can vote. Public voting is the default submission-safe option.
             </p>
             <fieldset className="mode-picker">
               <legend>Eligibility mode</legend>
-              {[
-                ["GEN", "GEN holding"],
-                ["POAP_NFT", "NFT / POAP credential"],
-              ].map(([v, l]) => (
-                <label key={v}>
-                  <input
-                    type="radio"
-                    name="mode"
-                    checked={form.mode === v}
-                    onChange={() => set("mode", v)}
-                  />
-                  {l}
-                </label>
-              ))}
+              <label><input type="radio" name="mode" checked={form.mode === "PUBLIC"} onChange={() => { set("mode", "PUBLIC"); setError(""); }} /> Public voting — anyone with a connected wallet can vote</label>
+              <label><input type="radio" name="mode" checked={form.mode === "POAP_EVENT"} onChange={() => { set("mode", "POAP_EVENT"); setError(""); }} /> POAP eligibility — Experimental — external verification may be unavailable.</label>
             </fieldset>
-            {form.mode === "GEN" ? (
-              <>
-                <label>
-                  Minimum GEN balance
-                  <input
-                    required
-                    pattern="[0-9]+([.][0-9]{1,18})?"
-                    inputMode="decimal"
-                    value={form.minimum}
-                    onChange={(e) => set("minimum", e.target.value)}
-                    placeholder="100"
-                  />
-                </label>
-                <p className="small muted">
-                  GEN is not spent or locked. It is only used to verify
-                  eligibility.
-                </p>
-              </>
-            ) : (
-              <>
-                <CredentialPicker
-                  form={form}
-                  onChange={(patch) => {
-                    setForm((f) => ({ ...f, ...patch }));
-                    setError("");
-                  }}
-                />
-              </>
-            )}
+            {form.mode === "POAP_EVENT" && <CredentialPicker form={form} onChange={(patch) => { setForm((f) => ({ ...f, ...patch })); setError(""); }} />}
           </>
         )}
         {step === 4 && (
           <>
-            <p>Check the details before creating your proposal on Bradbury.</p>
+            <p>Check the details before creating your proposal on {voxenConfig.networkName}.</p>
             <h3>{form.title}</h3>
             <p className="wrap">{form.description}</p>
             <dl className="review-list">
@@ -328,26 +288,18 @@ export function CreateProposalForm() {
               </dd>
               <dt>Eligibility</dt>
               <dd>
-                {form.mode === "GEN_HOLDING"
-                  ? `Holding at least ${form.minimum} GEN`
-                  : `Hold the selected NFT / POAP credential`}
+                {form.mode === "PUBLIC" ? "Public voting — anyone with a connected wallet can vote" : "Experimental POAP eligibility — external verification may be unavailable."}
               </dd>
-              {form.mode === "POAP_NFT" && (
+              {form.mode === "POAP_EVENT" && (
                 <>
                   <dt>Credential details</dt>
                   <dd>
                     <details>
                       <summary>Technical details</summary>
                       <p className="wrap">
-                        Collection: {form.contract}
+                        Portal record: {form.poapMetadata}
                         <br />
-                        Standard: {form.standard}
-                        {form.standard === "ERC1155" && (
-                          <>
-                            <br />
-                            Token ID: {form.token}
-                          </>
-                        )}
+                        Legacy POAP event ID: {form.poapEventId}
                       </p>
                     </details>
                   </dd>
@@ -366,7 +318,7 @@ export function CreateProposalForm() {
               <p role="status">Connect your wallet to create this proposal.</p>
             ) : !wallet.isOnCorrectNetwork ? (
               <p role="status">
-                Switch to GenLayer Bradbury to create this proposal.
+                Switch to {voxenConfig.networkName} to create this proposal.
               </p>
             ) : (
               <p className="small">

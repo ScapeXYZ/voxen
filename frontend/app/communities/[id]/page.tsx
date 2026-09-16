@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { use } from "react";
 import { AddressDisplay } from "@/components/governance/AddressDisplay";
+import { voxenConfig } from "@/lib/voxen/config";
 
 export default function CommunityPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -17,7 +18,7 @@ export default function CommunityPage({ params }: { params: Promise<{ id: string
   });
   return <main id="main" className="shell page">
     <Link href="/communities" className="eyebrow">← COMMUNITIES</Link>
-    {query.isPending && <p role="status">Loading Community from Bradbury…</p>}
+    {query.isPending && <p role="status">Loading Community from {voxenConfig.networkName}…</p>}
     {query.isError && <p role="alert">{query.error.message}</p>}
     {query.data && <><span className="eyebrow">LIVE COMMUNITY · {query.data.id}</span><h1>{query.data.name}</h1><p>{query.data.description || "No description was provided."}</p><section className="panel"><h2>Governance rules</h2><p>{query.data.governanceRules || "No governance rules were provided."}</p><p><strong>Governance Review:</strong> {query.data.guardEnabled ? "Enabled" : "Not enabled"}</p><p><strong>Status:</strong> {query.data.active ? "Active" : "Inactive"}</p><p><strong>Owner:</strong> <AddressDisplay address={query.data.owner} /></p></section></>}
   </main>;

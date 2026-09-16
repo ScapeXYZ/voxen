@@ -1,6 +1,7 @@
 import { isAddress } from "viem";
 import { credentialCatalog } from "./catalog";
 import type { Credential, CredentialProvider } from "./types";
+import { voxenConfig, voxenNetworkLabel } from "../config";
 
 export function createCatalogProvider(
   catalog: readonly Credential[],
@@ -27,8 +28,8 @@ export function credentialProblem(c: Credential): string {
     return "Missing canonical verification metadata.";
   if (!["ERC721_COLLECTION", "ERC1155_TOKEN"].includes(v.mode))
     return "Unsupported credential representation. POAP event ownership cannot be verified by the current contract.";
-  if (v.chainId !== 4221)
-    return "Unsupported chain. Voting currently verifies credentials on Bradbury (4221) only.";
+  if (v.chainId !== voxenConfig.chainId)
+    return `Unsupported chain. Voting currently verifies credentials on ${voxenNetworkLabel} only.`;
   if (
     !v.contractAddress ||
     !isAddress(v.contractAddress) ||

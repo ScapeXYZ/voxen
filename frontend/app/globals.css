@@ -1329,6 +1329,18 @@ dd {
   height: 3px;
   background: #8fa17d;
 }
+.vote-transaction {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-left: 3px solid #8fa17d;
+  background: #f4f6ef;
+  font-size: 12px;
+}
+.vote-transaction code { overflow-wrap: anywhere; }
+.vote-failed { border-left-color: #b86b63; background: #fbf0ee; }
+.vote-finalized { border-left-color: #5f835d; }
 .full-width {
   width: 100%;
   margin-top: 12px;
