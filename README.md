@@ -1,143 +1,158 @@
-# Sample GenLayer project
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/license/mit/)
-[![Discord](https://img.shields.io/badge/Discord-Join%20us-5865F2?logo=discord&logoColor=white)](https://discord.gg/8Jm4v89VAu)
-[![Telegram](https://img.shields.io/badge/Telegram--T.svg?style=social&logo=telegram)](https://t.me/genlayer)
-[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/yeagerai.svg?style=social&label=Follow%20%40GenLayer)](https://x.com/GenLayer)
-[![GitHub star chart](https://img.shields.io/github/stars/yeagerai/genlayer-project-boilerplate?style=social)](https://star-history.com/#yeagerai/genlayer-js)
+# Voxen
 
-## About
-This project includes the boilerplate code for a GenLayer use case implementation, specifically a football bets game.
+Voxen is a governance platform for communities that need decisions to be understandable and verifiable. Communities can create proposals, define participation rules, collect contract-enforced votes, and follow decisions through GenLayer consensus and finalization.
 
-## What's included
-- An example intelligent contract (Football Bets) with web access and LLM integration
-- **Direct mode tests** — fast, in-memory unit tests with web/LLM mocking (~ms per test)
-- **Integration tests** — full end-to-end tests against GenLayer Studio
-- **Contract linting** — static analysis to catch common contract issues before deployment
-- **CI pipeline** — GitHub Actions workflow for linting and direct tests
-- A production-ready Next.js 15 frontend with TypeScript, TanStack Query, and Radix UI
-- Configuration file template and deployment scripts
+## Live links
 
-## Requirements
-- Python >= 3.12
-- [GenLayer CLI](https://github.com/genlayerlabs/genlayer-cli) globally installed: `npm install -g genlayer`
-- GenLayer Studio (for integration tests and deployment): Install from [Docs](https://docs.genlayer.com/developers/intelligent-contracts/tooling-setup#using-the-genlayer-studio) or use the hosted [GenLayer Studio](https://studio.genlayer.com/)
+- Application: [voxen-tau.vercel.app](https://voxen-tau.vercel.app)
+- Live Proof: [voxen-tau.vercel.app/live-proof](https://voxen-tau.vercel.app/live-proof)
+- Source: [ScapeXYZ/voxen](https://github.com/ScapeXYZ/voxen)
+- Contract explorer: [0x3da4C8759A6D0a948C918969b63bd59d44bC588F](https://explorer-studio-dev.genlayer.com/address/0x3da4C8759A6D0a948C918969b63bd59d44bC588F)
 
-## Project Structure
+## The problem
 
-```
-contracts/              # Python intelligent contracts
-tests/
-  direct/               # Fast in-memory tests (no Studio required)
-    test_create_bet.py   # Bet creation logic
-    test_resolve_bet.py  # Bet resolution with web/LLM mocks
-    test_views.py        # Read-only view methods
-  integration/           # Full tests against GenLayer Studio
-    test_football_bets.py
-    fixtures.py          # Expected state fixtures
-frontend/               # Next.js 15 app (TypeScript, TanStack Query, Radix UI)
-deploy/                 # TypeScript deployment scripts
-gltest.config.yaml      # Test runner network configuration
-pyproject.toml          # Python/pytest configuration
-.github/workflows/      # CI pipeline
-```
+Community governance is commonly fragmented across discussion tools, wallets, and voting applications. Participants can struggle to confirm who is eligible, which rules apply, whether a transaction finalized, and which result is authoritative.
 
-## Quick Start
+## What Voxen does
 
-### 1. Set up Python environment
+Voxen brings proposal state and voting enforcement to a GenLayer intelligent contract. The application presents that contract state so communities can discover proposals, review participation rules, vote during an active window, and follow the resulting decision.
 
-```shell
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+## Why GenLayer
 
-### 2. Lint your contracts
+GenLayer provides Voxen's intelligent-contract execution and validator-consensus layer. The contract is the authoritative source for proposal state, eligibility, voting enforcement, and tallies. The frontend tracks transaction and consensus state, and does not treat `ACCEPTED` as a successful vote: it waits for `FINALIZED`.
 
-Run the GenVM linter to catch issues before deployment:
+## Core features
 
-```shell
-genvm-lint check contracts/football_bets.py
-```
+- Public proposal discovery and public proposal creation
+- `PUBLIC` eligibility
+- Contract-enforced voting windows and one final vote per wallet
+- Live results or results hidden until voting closes
+- Transaction and consensus-state tracking
+- Proposal lifecycle display
+- Communities and governance settings
+- Governance Review
+- Live Proof
+- Experimental, fail-closed POAP eligibility
+- Responsive light and dark interface
 
-The linter catches:
-- Forbidden imports and non-deterministic calls
-- Invalid storage types (must use `TreeMap`, `DynArray`, `u256`, etc.)
-- Missing decorators and return type annotations
-- Non-deterministic operations outside equivalence principle blocks
-- And [20+ other rules](https://github.com/genlayerlabs/genvm-linter)
+## How the governance flow works
 
-### 3. Run direct mode tests
+1. A community configures its governance settings and creates a proposal.
+2. The proposal defines options, a voting window, result visibility, and participation rules.
+3. Validators execute the contract transaction; the application waits for it to become `FINALIZED`.
+4. Eligible wallets cast votes while the voting window is active.
+5. The contract enforces the voting rules and records tallies; the application reads the resulting contract state.
+6. A proposal can move through its displayed lifecycle, including Governance Review where configured, to its recorded outcome.
 
-Direct mode tests run contracts in-memory without needing GenLayer Studio. They use mocks for web requests and LLM calls, giving you fast feedback (~milliseconds per test):
+## Architecture
 
-```shell
-pytest tests/direct/ -v
-```
+- Python GenLayer Intelligent Contract in `contracts/voxen.py`
+- Generated compact deployment artifact in `artifacts/voxen.compact.py`
+- Next.js frontend in `frontend/`
+- `genlayer-js` for contract reads, writes, and transaction tracking
+- GenLayer Transaction Kit for wallet transaction flows
+- Studio Next RPC for the active network connection
+- Vercel deployment for the public application
 
-Direct mode features used in these tests:
-- `direct_deploy("contracts/file.py")` — deploy contract in memory
-- `direct_vm.sender = address` — set transaction sender
-- `direct_vm.mock_web(pattern, response)` — mock HTTP/render calls
-- `direct_vm.mock_llm(pattern, response)` — mock LLM responses
-- `direct_vm.expect_revert("message")` — assert expected failures
-- `direct_vm.clear_mocks()` — reset mocks between calls
+## Studio Next deployment
 
-### 4. Deploy the contract
+| Setting | Value |
+| --- | --- |
+| Network | GenLayer Studio Next |
+| Chain ID | `61997` |
+| RPC | `https://studio-next.genlayer.com/api` |
+| Active contract | `0x3da4C8759A6D0a948C918969b63bd59d44bC588F` |
+| Deployment transaction | `0x0c060f3b89c53bc91ad1580c24a9abeca3482de10c955089b705f19ce25236b8` |
 
-1. Choose your network: `genlayer network`
-2. Deploy: `genlayer deploy` (runs the script in `/deploy/deployScript.ts`)
+The latest confirmed public-voting smoke test created a proposal in transaction `0x4b7e9c4f6e194798534716e90bd5fcb9759a0b01da2ae0db640fbefe7e7fb186`, cast a vote in transaction `0x19788af3245f33fe69c225e4498eda059beb6a900d59d5da77f4dbb4cb80292b`, confirmed `PUBLIC_ELIGIBLE`, and read a final tally of `[1, 0]` with one total vote.
 
-### 5. Run integration tests
+## Run locally
 
-Integration tests deploy the contract to GenLayer Studio and test with real consensus:
-
-```shell
-gltest tests/integration/ -v -s
-```
-
-These require GenLayer Studio running (local or hosted).
-
-### 6. Set up the frontend
-
-1. Copy `frontend/.env.example` to `frontend/.env`
-2. Add your deployed contract address as `NEXT_PUBLIC_CONTRACT_ADDRESS`
-3. Run:
-
-```shell
-cd frontend
+```bash
+git clone https://github.com/ScapeXYZ/voxen.git
+cd voxen
+nvm use 22
 npm install
-npm run dev
+cp frontend/.env.example frontend/.env.local
+npm run dev --workspace frontend
 ```
 
-The app will be available at http://localhost:3000/.
+Open [http://localhost:3000](http://localhost:3000).
 
-## How the Football Bets Contract Works
+## Environment configuration
 
-1. **Creating Bets**: Users bet on a football match by providing the game date, teams, and predicted winner.
-2. **Resolving Bets**: After the match, the contract fetches results from BBC Sport, uses an LLM to extract the score, and validates via the equivalence principle.
-3. **Points**: Correct predictions earn points. Users can query their points or the leaderboard.
+Copy `frontend/.env.example` to `frontend/.env.local`. It contains public frontend configuration only:
 
-## Testing Strategy
+```dotenv
+NEXT_PUBLIC_VOXEN_CONTRACT=0x3da4C8759A6D0a948C918969b63bd59d44bC588F
+NEXT_PUBLIC_GENLAYER_RPC=https://studio-next.genlayer.com/api
+NEXT_PUBLIC_GENLAYER_EVM_RPC=https://studio-next.genlayer.com/api
+NEXT_PUBLIC_GENLAYER_CHAIN_ID=61997
+NEXT_PUBLIC_GENLAYER_NETWORK_NAME=Studio Next
+```
 
-| Test Type | Command | Speed | Requires Studio |
-|-----------|---------|-------|-----------------|
-| **Lint** | `genvm-lint check contracts/*.py` | ~250ms | No |
-| **Direct** | `pytest tests/direct/ -v` | ~ms/test | No |
-| **Integration** | `gltest tests/integration/ -v -s` | ~min/test | Yes |
+Do not commit local environment files or credentials.
 
-**Recommended workflow:**
-1. Lint after every contract change
-2. Run direct tests frequently during development
-3. Run integration tests before deployment to verify consensus behavior
+## Verify the project
 
-For AI coding agents (Claude Code, Cursor, etc.), the linter and direct tests provide the fast feedback loop needed for iterative development without requiring a running Studio instance.
+1. Open the [live application](https://voxen-tau.vercel.app).
+2. Open Live Proof and confirm Studio Next, chain ID `61997`, and the deployed contract.
+3. Connect a funded GenLayer wallet.
+4. Create a proposal with `PUBLIC` eligibility, two options, and an active voting period.
+5. Wait until the creation transaction is `FINALIZED`.
+6. Open the new proposal.
+7. Confirm `PUBLIC_ELIGIBLE`.
+8. Select an option and cast a vote.
+9. Wait until the vote transaction is `FINALIZED`.
+10. Refresh the proposal and confirm the tally increased.
+11. Attempting another final vote from the same wallet must be rejected by the contract.
 
-## Community
-- **[Discord](https://discord.gg/8Jm4v89VAu)**: Discussions, support, and announcements
-- **[Telegram](https://t.me/genlayer)**: Informal chats and quick updates
+Use a new active proposal; do not rely on an expired hardcoded proposal.
 
-## Documentation
-For detailed information, see our [documentation](https://docs.genlayer.com/).
+## Automated smoke test
 
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```bash
+node scripts/smoke-public-vote.mjs
+```
+
+The script verifies the chain and signer, creates a `PUBLIC` proposal, waits for finalization, derives the proposal ID through contract reads, checks `PUBLIC_ELIGIBLE`, casts one vote, and reads the final tally. Writes require a funded Studio Next account and the project's configured keystore flow. It does not print or document a keystore path, password, or private key.
+
+## Testing and validation
+
+```bash
+npm test --prefix frontend
+npm run lint --prefix frontend
+npm run build --prefix frontend
+python3 tools/build_voxen_compact.py --check
+python3 -m py_compile contracts/voxen.py artifacts/voxen.compact.py
+git diff --check
+```
+
+## Known limitations
+
+- POAP eligibility is experimental and fails closed when external verification is unavailable.
+- Studio Next is a test network.
+- The current contract does not expose a public per-wallet ballot-status view after a page reload; duplicate voting remains contract-enforced.
+- Direct local GenVM tests may require the exact runner version pinned by the project.
+
+## Roadmap
+
+- Public voter-status read
+- Improved proposal receipt decoding
+- Community-to-proposal indexing
+- Additional credential adapters
+- Governance summaries and evidence review
+- Notifications and analytics
+- Production-network deployment when available
+
+## Repository structure
+
+```text
+contracts/  Python GenLayer intelligent contract source
+artifacts/  Generated compact deployment artifact
+frontend/   Next.js application
+scripts/    Deployment and public-vote smoke-test scripts
+tests/      Contract test suites
+tools/      Artifact build and consistency tooling
+docs/       Project notes and technical documentation
+```
